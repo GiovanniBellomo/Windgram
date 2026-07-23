@@ -82,8 +82,13 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
     `py tools/snapshot.py` — deve stampare "OK: output identico al golden".
 
 ### Fase B — Strato 0 (dati)
-- [ ] **B1** Crea `windgram/sources/openmeteo.py`, SPOSTA lì i `fetch*` + `to_grid` da
+- [x] **B1** Crea `windgram/sources/openmeteo.py`, SPOSTA lì i `fetch*` + `to_grid` da
   `windgram_arome.py`; lascia in `windgram_arome.py` uno shim che li ri-esporta. Golden invariato.
+  - Spostati: `build_params, fetch, fetch_elevation, fetch_shf15, fetch_model_run, to_grid` +
+    costanti `PLEVELS, HLEVELS, API, ELEV_API, META_PATH`. Shim `from windgram.sources.openmeteo
+    import (...)` in cima a `windgram_arome.py` → `W.fetch` ecc. continuano a funzionare.
+  - Verificato: golden identico (170577 char), `--help` OK, `W.fetch.__module__` =
+    `windgram.sources.openmeteo`.
 
 ### Fase C — Strato 1 (fisica)
 - [ ] **C1** Crea `windgram/core/thermals.py`, SPOSTA `thermals, lapse_grid, lcl_height,
