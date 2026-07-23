@@ -74,8 +74,12 @@ array espliciti, `run_time_str`/`gen_time_str` passati come stringhe) da permett
 Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 
 ### Fase A — Rete di sicurezza (nessun cambio al codice di produzione)
-- [ ] **A1** Cattura fixture Open-Meteo reali + harness `tools/snapshot.py` + golden
+- [x] **A1** Cattura fixture Open-Meteo reali + harness `tools/snapshot.py` + golden
   `tests/golden/dashboard.svg`. Commit. Da qui in poi ogni step è protetto.
+  - `tools/capture_fixture.py` (rete, una-tantum) → `tests/fixtures/piancavallo_icon_d2.json`
+  - `tools/snapshot.py` (offline, deterministico): `--update` scrive il golden, senza args diffa.
+  - Golden = 170577 char, verificato deterministico su due run. **Uso**: dopo ogni step, lanciare
+    `py tools/snapshot.py` — deve stampare "OK: output identico al golden".
 
 ### Fase B — Strato 0 (dati)
 - [ ] **B1** Crea `windgram/sources/openmeteo.py`, SPOSTA lì i `fetch*` + `to_grid` da
