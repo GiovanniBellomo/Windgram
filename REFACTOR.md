@@ -100,8 +100,14 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
   Golden invariato.
   - Era fisica incastonata nel file di rendering (l'entanglement peggiore). Ora `windgram_v2.py`
     fa `from windgram.core.climb import climb_ceiling, SINK_RATE`. Golden identico (170577 char).
-- [ ] **C3** SPOSTA `aggregate` (+`_best_block`) da `windgram_v2.py` a
+- [x] **C3** SPOSTA `aggregate` (+`_best_block`) da `windgram_v2.py` a
   `windgram/core/aggregate.py`. Golden invariato.
+  - Spostato anche `_card16` (gradi->cardinale): e' un'etichetta semantica condivisa fra
+    `aggregate` (core) e la tabella in `build_svg` (render). Sta in core, il render la
+    importa (dipendenza render->core, mai il contrario). `windgram_v2.py` fa
+    `from windgram.core.aggregate import aggregate, _card16`. Golden identico (170577 char).
+  - **Fase C completa**: tutta la fisica/logica derivata e' uscita dal file di rendering.
+    `windgram_v2.py` ora e' presentazione (SVG) + orchestrazione (`main`).
 
 ### Fase D — Ritiro v1 PNG
 - [ ] **D1** Elimina `plot, make_colormap, _cloud_path, _smooth, _draw_cb, main` e gli import
