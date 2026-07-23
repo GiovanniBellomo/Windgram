@@ -371,3 +371,16 @@ il perché di una scelta specifica non ovvia dal codice.
   sintetici. Per l'anteprima grafica si è usato in passato `cairosvg` (svg2png) — solo in sviluppo,
   non runtime, e non è tra le dipendenze installate di default.
 - `to_grid` filtra al **primo giorno** nella finestra oraria; con `forecast_days=2` prende oggi.
+
+## 15. Controllo versione (git)
+
+Repository git **locale** inizializzato il 2026-07-23 (prima non esisteva nessuno storico).
+**Nessun remote configurato** — resta solo sulla macchina finché non viene deciso altrimenti.
+
+`.gitignore` esclude: output generati (`*.html`, `*.png` — rigenerabili da codice + dati live,
+non ha senso versionarli) e `.claude/` (config locale di Claude Code, specifica della macchina).
+Restano tracciati: `windgram_v2.py`, `windgram_arome.py`, `CLAUDE.md`, `Esecuzione.txt`.
+
+**Regola permanente (voluta esplicitamente da Giovanni il 2026-07-23): committare dopo OGNI
+modifica al codice**, non accumulare più cambi in un commit unico — lo storico deve restare
+leggibile e granulare. Non aspettare che l'utente lo richieda ogni volta.
