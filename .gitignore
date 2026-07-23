@@ -1,0 +1,10 @@
+# output generati dallo script (rigenerabili da codice + dati live, non da versionare)
+*.html
+*.png
+
+# cache Python
+__pycache__/
+*.pyc
+
+# config locale di Claude Code (permessi specifici di questa macchina/sessione)
+.claude/
