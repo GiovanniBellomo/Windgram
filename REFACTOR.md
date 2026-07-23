@@ -91,8 +91,11 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
     `windgram.sources.openmeteo`.
 
 ### Fase C — Strato 1 (fisica)
-- [ ] **C1** Crea `windgram/core/thermals.py`, SPOSTA `thermals, lapse_grid, lcl_height,
+- [x] **C1** Crea `windgram/core/thermals.py`, SPOSTA `thermals, lapse_grid, lcl_height,
   wind_profile, make_vscale`; shim di ri-esportazione. Golden invariato.
+  - Nuovo pacchetto `windgram/core/`. Shim `from windgram.core.thermals import (...)` in
+    `windgram_arome.py`. Verificato: golden identico (170577 char), `--help` OK,
+    `W.thermals.__module__` = `windgram.core.thermals`.
 - [ ] **C2** SPOSTA `climb_ceiling` (+`SINK_RATE`) da `windgram_v2.py` a `windgram/core/climb.py`.
   Golden invariato.
 - [ ] **C3** SPOSTA `aggregate` (+`_best_block`) da `windgram_v2.py` a
