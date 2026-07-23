@@ -374,8 +374,10 @@ il perché di una scelta specifica non ovvia dal codice.
 
 ## 15. Controllo versione (git)
 
-Repository git **locale** inizializzato il 2026-07-23 (prima non esisteva nessuno storico).
-**Nessun remote configurato** — resta solo sulla macchina finché non viene deciso altrimenti.
+Repository git inizializzato il 2026-07-23. Collegato a **GitHub** come repository **pubblico**
+(passato da privato a pubblico lo stesso giorno, scelta consapevole di Giovanni per sbloccare la
+funzione Wiki — su piano gratuito il Wiki richiede repo pubblico):
+`https://github.com/GiovanniBellomo/Windgram` (remote `origin`, branch `main`).
 
 `.gitignore` esclude: output generati (`*.html`, `*.png` — rigenerabili da codice + dati live,
 non ha senso versionarli) e `.claude/` (config locale di Claude Code, specifica della macchina).
@@ -383,4 +385,13 @@ Restano tracciati: `windgram_v2.py`, `windgram_arome.py`, `CLAUDE.md`, `Esecuzio
 
 **Regola permanente (voluta esplicitamente da Giovanni il 2026-07-23): committare dopo OGNI
 modifica al codice**, non accumulare più cambi in un commit unico — lo storico deve restare
-leggibile e granulare. Non aspettare che l'utente lo richieda ogni volta.
+leggibile e granulare. Non aspettare che l'utente lo richieda ogni volta. Il push verso `origin`
+NON è automatico — va confermato con l'utente come per qualsiasi azione che pubblica qualcosa.
+
+## 16. Wiki del progetto
+
+`https://github.com/GiovanniBellomo/Windgram/wiki` — 12 pagine organizzate per argomento,
+trasposizione human-friendly di questo stesso file (repo del wiki separato, clonabile da
+`https://github.com/GiovanniBellomo/Windgram.wiki.git`, branch `master` non `main`). **Se
+CLAUDE.md viene aggiornato, il wiki andrebbe risincronizzato di conseguenza** (non è automatico) —
+altrimenti le due fonti divergono nel tempo. `CLAUDE.md` resta la fonte di verità primaria.
