@@ -1,0 +1,129 @@
+# Piano di refactoring — separazione degli strati
+
+Documento di lavoro. Definisce la migrazione da 2 file monolitici a un'architettura a strati
+netti, **per piccoli passi**, ognuno committabile e **verificabile a output invariato**.
+Deciso con Giovanni il 2026-07-23. Vedi anche `DECISIONS.md` per le scelte di fondo.
+
+## Obiettivo
+
+Separare nettamente:
+- **Sorgenti dati** (acquisizione) → **Fisica** (calcoli puri) → **Contratto** (dato serializzabile)
+  → **Rappresentazioni** (renderer che consumano solo il contratto).
+
+Perché: multipiattaforma (mobile, widget WordPress), monetizzazione (l'API = il contratto JSON),
+e futura correzione statistica su osservazioni reali. Scelte confermate:
+- Fisica **server-side** (Python), il contratto **JSON** è il confine universale.
+- v1 (PNG matplotlib) **ritirata** → la fisica si libera di `matplotlib`/`scipy`.
+- Log storico delle previsioni **a costo ~zero** (scrivere il contratto su file per ogni run).
+
+## Principi non negoziabili
+
+1. **Output invariato a ogni passo.** Nessuno step cambia il pixel finale finché non è un cambio
+   di comportamento *voluto ed esplicito*. La rete di sicurezza (sotto) lo garantisce.
+2. **Passi piccoli, un commit ciascuno** (regola permanente del progetto).
+3. **Spostare, non riscrivere.** Nella prima parte si spostano funzioni fra moduli lasciando shim
+   di ri-esportazione, così nulla si rompe. La riscrittura vera (firme sul contratto) arriva dopo,
+   isolata.
+4. **Documentazione in pari** (CLAUDE.md, wiki, DECISIONS.md) a fine di ogni fase.
+
+## Architettura target
+
+```
+windgram/
+  __init__.py
+  sources/        # Strato 0 — SOLO acquisizione, nessun calcolo
+    openmeteo.py      (build_params, fetch, fetch_elevation, fetch_model_run,
+                       fetch_shf15, to_grid)
+    station.py        (FUTURO: osservazioni per la correzione statistica)
+  core/           # Strato 1 — fisica pura: ZERO I/O, ZERO grafica
+    thermals.py       (lapse_grid, lcl_height, thermals, wind_profile, make_vscale)
+    climb.py          (climb_ceiling, SINK_RATE)         # oggi in windgram_v2.py!
+    aggregate.py      (aggregate, _best_block)           # oggi in windgram_v2.py!
+  contract.py     # Strato 1.5 — dataclass Forecast (v1.0) + to_dict/from_dict/to_json + versione
+  render/         # Strato 2 — consuma SOLO il contratto
+    svg.py            (dashboard HTML+SVG, ex windgram_v2)
+    json_api.py       (serializza il contratto — banale)
+  cli.py          # orchestrazione: sources -> core -> contract -> render
+windgram_v2.py    # entry-point sottile mantenuto alla radice per non cambiare l'invocazione
+                  # abituale (`py windgram_v2.py --lat ...`) finche' non decidiamo di rinominare
+```
+
+La v1 `windgram_arome.py` sparisce: le funzioni utili migrano in `sources/` e `core/`, il codice
+matplotlib viene eliminato.
+
+## La rete di sicurezza (golden snapshot)
+
+Il cuore della sicurezza. Serve a diffare l'output prima/dopo ogni passo. L'output però dipende da
+dati live e dall'ora corrente → va **congelato**:
+
+- **Fixture**: si cattura UNA volta una risposta reale di Open-Meteo (forecast + elevation +
+  shf15) e la si salva in `tests/fixtures/*.json` (tracciati da git — il `.gitignore` ignora solo
+  `*.html`/`*.png`).
+- **Harness**: `tools/snapshot.py` carica la fixture, **inietta run-time e generated-time fissi**,
+  esegue la pipeline e scrive l'SVG in `tests/golden/dashboard.svg` (estensione `.svg` → tracciata).
+- **Verifica**: dopo ogni step si rigenera e si fa `diff` col golden. **Deve essere vuoto.**
+  Quando un cambio di comportamento è voluto, si aggiorna il golden *nello stesso commit* e si
+  documenta il perché.
+
+Nota: le funzioni attuali sono già abbastanza parametrizzate (`to_grid(data)`, `build_svg(...)` con
+array espliciti, `run_time_str`/`gen_time_str` passati come stringhe) da permettere l'harness
+**senza toccare il codice di produzione**. Questo rende lo Step A1 a rischio zero.
+
+## Fasi e step (checklist)
+
+Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
+
+### Fase A — Rete di sicurezza (nessun cambio al codice di produzione)
+- [ ] **A1** Cattura fixture Open-Meteo reali + harness `tools/snapshot.py` + golden
+  `tests/golden/dashboard.svg`. Commit. Da qui in poi ogni step è protetto.
+
+### Fase B — Strato 0 (dati)
+- [ ] **B1** Crea `windgram/sources/openmeteo.py`, SPOSTA lì i `fetch*` + `to_grid` da
+  `windgram_arome.py`; lascia in `windgram_arome.py` uno shim che li ri-esporta. Golden invariato.
+
+### Fase C — Strato 1 (fisica)
+- [ ] **C1** Crea `windgram/core/thermals.py`, SPOSTA `thermals, lapse_grid, lcl_height,
+  wind_profile, make_vscale`; shim di ri-esportazione. Golden invariato.
+- [ ] **C2** SPOSTA `climb_ceiling` (+`SINK_RATE`) da `windgram_v2.py` a `windgram/core/climb.py`.
+  Golden invariato.
+- [ ] **C3** SPOSTA `aggregate` (+`_best_block`) da `windgram_v2.py` a
+  `windgram/core/aggregate.py`. Golden invariato.
+
+### Fase D — Ritiro v1 PNG
+- [ ] **D1** Elimina `plot, make_colormap, _cloud_path, _smooth, _draw_cb, main` e gli import
+  `matplotlib`/`scipy` da `windgram_arome.py`. (v2 non li usa → golden invariato.) Il progetto
+  perde le dipendenze pesanti.
+
+### Fase E — Il contratto (il passo cardine, isolato)
+- [ ] **E1** Definisci `windgram/contract.py`: dataclass `Forecast` v1.0 + `to_dict/from_dict/
+  to_json`. Non ancora collegato. Test di round-trip (serializza→deserializza→uguale).
+- [ ] **E2** Aggiungi in `core/` una `build_forecast(...)` che assembla il contratto dagli output
+  della fisica. Test: da fixture → contratto → golden JSON `tests/golden/forecast.json`.
+- [ ] **E3** Rifai `build_svg`/`build_chart` perché consumino il `Forecast` invece dei ~20
+  parametri sciolti. **Cambio a comportamento invariato**: stessi dati, solo re-impacchettati.
+  Golden SVG invariato. Commit isolato (è lo step più delicato).
+
+### Fase F — Nuove superfici abilitate dal contratto
+- [ ] **F1** `windgram/render/json_api.py`: serializza il contratto (è di fatto il payload API).
+- [ ] **F2** Log a costo zero: `cli.py` scrive il contratto JSON in `history/AAAA-MM-GG_run.json`
+  a ogni esecuzione. Abilita la futura analisi errore.
+
+### Fase G — Struttura finale e pulizia
+- [ ] **G1** Sposta i file nel layout `windgram/` definitivo, aggiorna gli import, rimuovi gli shim
+  quando nessuno usa più i percorsi vecchi. Mantieni l'entry-point `windgram_v2.py` alla radice
+  come lanciatore sottile. Golden invariato.
+- [ ] **G2** Aggiorna CLAUDE.md, wiki, DECISIONS.md con la nuova architettura. Aggiungi pagina wiki
+  dedicata all'architettura a strati e al formato del contratto.
+
+## Note e rischi
+
+- **Invocazione CLI**: finché non decidiamo diversamente, resta `py windgram_v2.py --lat ...` (un
+  lanciatore sottile alla radice). Un eventuale passaggio a `py -m windgram` è una scelta separata,
+  non forzata da questo refactoring.
+- **Windows/`py`/UTF-8**: valgono le solite regole (vedi CLAUDE.md §14).
+- **Passi che cambiano comportamento**: solo E3 tocca le firme, ma a output identico. Se un giorno
+  vorremo cambiare *cosa* mostra il grafico, sarà uno step separato e dichiarato, con golden
+  aggiornato apposta.
+- **`therm_color`/`therm_opacity`/`grad_color`/`wstar_color`**: sono mappe dato→colore, quindi
+  **presentazione** — restano in `render/`, non in `core/`. Le soglie che incorporano (es. classi
+  W\*) sono già documentate in DECISIONS.md.
