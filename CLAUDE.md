@@ -40,7 +40,7 @@ del modello **ICON-D2 (~2.2 km)** via **API pubblica Open-Meteo** (gratuita, no 
 
 Due deliverable:
 - **v1** `windgram_arome.py` — grafico tecnico PNG (matplotlib). Il file attualmente nella
-  cartella è la versione **COMPLETA** (695 righe: motore dati/fisica + `plot()` + `main()` per
+  cartella è la versione **COMPLETA** (~720 righe: motore dati/fisica + `plot()` + `main()` per
   il rendering PNG) — vedi §3.
 - **v2** `windgram_v2.py` — **dashboard HTML+SVG** (cruscotto da pilota). È il focus attuale.
 
@@ -64,14 +64,15 @@ Dipendenze: `requests numpy` (v2). La v1 completa richiede anche `matplotlib sci
 
 | File | Ruolo | Stato |
 |------|-------|-------|
-| `windgram_arome.py` | Motore dati/fisica (fetch, parsing, calcoli termici) **+ rendering PNG completo** (`plot()`, `make_colormap`, `_cloud_path`, `_smooth`, `_draw_cb`, `main()`). 695 righe. | Attivo, importato da v2 |
-| `windgram_v2.py` | Dashboard HTML+SVG. Importa `windgram_arome as W`. 1019 righe. | In sviluppo attivo |
+| `windgram_arome.py` | Motore dati/fisica (fetch, parsing, calcoli termici) **+ rendering PNG completo** (`plot()`, `make_colormap`, `_cloud_path`, `_smooth`, `_draw_cb`, `main()`). ~720 righe. | Attivo, importato da v2 |
+| `windgram_v2.py` | Dashboard HTML+SVG. Importa `windgram_arome as W`. ~1135 righe. | In sviluppo attivo |
 | `windgram_v2_spec.md` | Specifica del layout v2 e mappatura dato→elemento | Non presente in cartella al momento — solo riferimento storico se ricreato |
 
 **IMPORTANTISSIMO:** `windgram_v2.py` fa `import windgram_arome as W`. I due file DEVONO stare
 nella **stessa cartella**. Da `windgram_arome.py`, v2 usa solo il motore:
-`fetch, fetch_elevation, fetch_model_run, to_grid, lapse_grid, thermals, wind_profile,
-make_vscale` (+ costanti `PLEVELS, HLEVELS, API, ELEV_API`) — non tocca `plot()`/`main()`.
+`fetch, fetch_elevation, fetch_model_run, fetch_shf15, to_grid, lapse_grid, thermals,
+wind_profile, make_vscale` (+ costanti `PLEVELS, HLEVELS, API, ELEV_API`) — non tocca
+`plot()`/`main()`.
 Se in futuro si dovesse tornare a una versione "motore-only" senza matplotlib/scipy per alleggerire
 l'import in v2 (che oggi trascina comunque le dipendenze pesanti di v1 solo per importare il
 modulo), va isolata separatamente: **non dare per scontato che il file in cartella sia snello,
