@@ -75,9 +75,10 @@ class WindProfile:
 @dataclass
 class LapseProfile:
     """Gradiente termico a strati per lo sfondo: `edges_m` = quote dei confini di
-    strato (m slm, suolo incluso), `rate_c100m` = ΔT/100 m di ogni strato
-    (len = len(edges_m) - 1; `None` dove non calcolabile)."""
-    edges_m: list[float]
+    strato (m slm, suolo incluso; `None` dove la quota del livello manca a
+    quell'ora), `rate_c100m` = ΔT/100 m di ogni strato (len = len(edges_m) - 1;
+    `None` dove non calcolabile)."""
+    edges_m: list[float | None]
     rate_c100m: list[float | None]
 
 
@@ -90,6 +91,11 @@ class Hour:
     lcl_m: float | None         # base cumuli (m slm)
     work_top_m: float | None    # soffitto meteorologico min(zi, lcl) (m slm)
     climb_top_m: float | None   # quota realisticamente raggiungibile (m slm)
+    wstar_slope_15min: float | None  # variazione di W* su +-15' (usa il flusso reale a 15'
+                                #   se disponibile): misura la "stabilita'" della termica.
+                                #   Serve al renderer per la trasparenza della linea; e' qui
+                                #   perche' dipende dal dato a 15' (shf15), non ricavabile a
+                                #   valle dai soli scalari orari. `None` se non calcolabile.
     overdev: bool               # sovrasviluppo
     cloud_low_pct: float | None
     cape: float | None

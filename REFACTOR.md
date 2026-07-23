@@ -130,8 +130,16 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
   - Test `tests/test_contract.py` (senza pytest, `py tests/test_contract.py`): round-trip
     JSON/dict, invarianti None→null, indent. **Non ancora agganciato** al rendering (E2/E3).
     Golden invariato (170577 char).
-- [ ] **E2** Aggiungi in `core/` una `build_forecast(...)` che assembla il contratto dagli output
+- [x] **E2** Aggiungi in `core/` una `build_forecast(...)` che assembla il contratto dagli output
   della fisica. Test: da fixture → contratto → golden JSON `tests/golden/forecast.json`.
+  - `windgram/core/forecast.py`: `build_forecast(...)` precalcola climb_top (climb_ceiling),
+    profilo vento nativo (`wind_samples`, nuova in `core/thermals.py`), profilo lapse
+    (`lapse_grid`), e `wstar_slope_15min` (replica ESATTA della logica di build_chart, cosi' E3
+    riprodurra' il golden SVG). Contratto: aggiunto `Hour.wstar_slope_15min`; `LapseProfile.edges_m`
+    ora ammette `None`.
+  - `tools/snapshot.py` esteso: verifica DUE golden (SVG + `forecast.json`) con input condivisi.
+    Golden SVG invariato (170577), golden contratto creato (30356 char, 13 ore). `build_forecast`
+    NON ancora usato dal renderer (quello e' E3).
 - [ ] **E3** Rifai `build_svg`/`build_chart` perché consumino il `Forecast` invece dei ~20
   parametri sciolti. **Cambio a comportamento invariato**: stessi dati, solo re-impacchettati.
   Golden SVG invariato. Commit isolato (è lo step più delicato).

@@ -95,6 +95,34 @@ def thermals(times, levels, surf, elev):
     return zi, wstar, lcl, work_top, overdev
 
 
+def wind_samples(levels, hwind, surf, elev, j):
+    """Profilo di vento risolto alle quote NATIVE del dato all'ora j (superficie
+    10 m + height-level + livelli di pressione), in componenti (u,v). E' la parte
+    "pre-interpolazione" di `wind_profile`: ritorna liste Python (agl, u, v)
+    ordinate per quota, pronte per il contratto. Il consumatore interpola da qui
+    alle quote che gli servono. Liste vuote se ci sono meno di 2 campioni."""
+    ag, us, vs = [], [], []
+
+    def add(agl, ws, wd):
+        if not (np.isnan(ws) or np.isnan(wd)):
+            ag.append(float(agl))
+            us.append(float(-ws * np.sin(np.deg2rad(wd))))
+            vs.append(float(-ws * np.cos(np.deg2rad(wd))))
+    if surf["ws10"] is not None:
+        add(10.0, surf["ws10"][j], surf["wd10"][j])
+    for w in hwind:
+        add(float(w["agl"]), w["ws"][j], w["wd"][j])
+    for l in levels:
+        z = l["z"][j]
+        if not np.isnan(z):
+            add(z - elev, l["ws"][j], l["wd"][j])
+    if len(ag) < 2:
+        return [], [], []
+    o = np.argsort(ag)
+    ag = [ag[i] for i in o]; us = [us[i] for i in o]; vs = [vs[i] for i in o]
+    return ag, us, vs
+
+
 def wind_profile(levels, hwind, surf, elev, j, agl_targets):
     """Interpola (u,v) del vento sulle quote AGL richieste, all'ora j."""
     ag, us, vs = [], [], []

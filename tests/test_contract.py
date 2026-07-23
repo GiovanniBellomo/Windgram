@@ -26,16 +26,18 @@ def sample_forecast():
                 period_start_h=8, period_end_h=20)
     h1 = Hour(
         time="2026-07-23T14:00:00+02:00", wstar=2.44, zi_m=3111.0, lcl_m=2148.0,
-        work_top_m=2148.0, climb_top_m=2148.0, overdev=False, cloud_low_pct=62.0,
+        work_top_m=2148.0, climb_top_m=2148.0, wstar_slope_15min=0.16,
+        overdev=False, cloud_low_pct=62.0,
         cape=120.0, lifted_index=-1.0, precip_mm=0.0, freezing_level_m=3150.0,
         surface=Surface(t2m_c=19.0, td2m_c=8.0, wind_ms=3.6, gust_ms=8.3, dir_deg=180.0),
         wind=WindProfile(agl_m=[10.0, 1000.0, 2000.0], u_ms=[-0.5, -1.2, -2.0],
                          v_ms=[-3.5, -5.0, -6.1]),
-        lapse=LapseProfile(edges_m=[1098.0, 1500.0, 3000.0],
+        lapse=LapseProfile(edges_m=[1098.0, 1500.0, None],
                            rate_c100m=[0.8, None]))
     h2 = Hour(
         time="2026-07-23T15:00:00+02:00", wstar=None, zi_m=None, lcl_m=None,
-        work_top_m=None, climb_top_m=None, overdev=True, cloud_low_pct=None,
+        work_top_m=None, climb_top_m=None, wstar_slope_15min=None,
+        overdev=True, cloud_low_pct=None,
         cape=None, lifted_index=None, precip_mm=None, freezing_level_m=None,
         surface=Surface(t2m_c=None, td2m_c=None, wind_ms=None, gust_ms=None, dir_deg=None),
         wind=WindProfile(agl_m=[], u_ms=[], v_ms=[]),
@@ -63,7 +65,9 @@ def main():
     d = json.loads(s)
     assert d["contract_version"] == CONTRACT_VERSION
     assert d["hours"][1]["wstar"] is None
+    assert d["hours"][1]["wstar_slope_15min"] is None
     assert d["hours"][0]["lapse"]["rate_c100m"][1] is None
+    assert d["hours"][0]["lapse"]["edges_m"][2] is None
     assert "NaN" not in s, "il JSON non deve contenere NaN"
 
     # 3) indent opzionale non altera i dati
