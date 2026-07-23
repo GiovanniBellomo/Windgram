@@ -110,9 +110,13 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
     `windgram_v2.py` ora e' presentazione (SVG) + orchestrazione (`main`).
 
 ### Fase D — Ritiro v1 PNG
-- [ ] **D1** Elimina `plot, make_colormap, _cloud_path, _smooth, _draw_cb, main` e gli import
+- [x] **D1** Elimina `plot, make_colormap, _cloud_path, _smooth, _draw_cb, main` e gli import
   `matplotlib`/`scipy` da `windgram_arome.py`. (v2 non li usa → golden invariato.) Il progetto
   perde le dipendenze pesanti.
+  - `windgram_arome.py` ridotto da 474 a **27 righe** (pura facciata di soli shim). Verificato:
+    importando `W` **nessun** modulo matplotlib/scipy viene caricato; golden identico (170577
+    char); `--help` OK. Dipendenze runtime ora: solo `requests numpy` (per v2). `matplotlib scipy`
+    non servono piu'.
 
 ### Fase E — Il contratto (il passo cardine, isolato)
 - [ ] **E1** Definisci `windgram/contract.py`: dataclass `Forecast` v1.0 + `to_dict/from_dict/

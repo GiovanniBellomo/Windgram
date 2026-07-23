@@ -33,6 +33,8 @@ Due tabelle separate:
 | 2026-07-23 | Linea "zero termico stimato" spostata **in secondo piano** (disegnata subito dopo lo sfondo, prima di griglia/barbe/nuvole/etichette), resa sottile/tratteggiata/semi-trasparente (opacità 0.7), con icona a fiocco di neve ad ogni ora | Richiesta esplicita — è un riferimento di massima, non deve competere visivamente con i dati operativi; il fiocco di neve la mantiene individuabile anche così. |
 | 2026-07-23 | Rimossa la riga "Prossimo aggiornamento dati" dall'header (non corretta la stima) | La stima (corsa+3h) non è affidabile — vedi Fatti sotto — e non c'è modo di calcolarla in modo affidabile con i dati esposti dall'API. Meglio niente che un orario spesso sbagliato. |
 | 2026-07-23 | Header: "Modello dati delle" → **"Modello dati aggiornato alle"** | Chiarezza ulteriore su cosa rappresenta l'orario mostrato. |
+| 2026-07-23 | **Refactoring a strati** (sources/core/contract/render) per piccoli passi, con rete di sicurezza golden-snapshot | Progetto cresciuto: strati entangled (fisica dentro il file di rendering). Obiettivo: multipiattaforma (mobile/WordPress), monetizzazione (API=contratto JSON), correzione statistica futura. Piano completo in `REFACTOR.md`. |
+| 2026-07-23 | **v1 PNG (matplotlib) RITIRATA** (eseguito in D1): rimossi `plot/make_colormap/_cloud_path/_smooth/_draw_cb/main` e gli import `matplotlib`/`scipy` da `windgram_arome.py` (ridotto a 27 righe di soli shim) | Confermato da Giovanni. Il rendering utile e' la dashboard SVG (v2); il PNG tecnico non serve piu' e trascinava matplotlib/scipy sull'intero progetto. Dipendenze runtime ora solo `requests numpy`. |
 
 ## Fatti
 
