@@ -96,8 +96,10 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
   - Nuovo pacchetto `windgram/core/`. Shim `from windgram.core.thermals import (...)` in
     `windgram_arome.py`. Verificato: golden identico (170577 char), `--help` OK,
     `W.thermals.__module__` = `windgram.core.thermals`.
-- [ ] **C2** SPOSTA `climb_ceiling` (+`SINK_RATE`) da `windgram_v2.py` a `windgram/core/climb.py`.
+- [x] **C2** SPOSTA `climb_ceiling` (+`SINK_RATE`) da `windgram_v2.py` a `windgram/core/climb.py`.
   Golden invariato.
+  - Era fisica incastonata nel file di rendering (l'entanglement peggiore). Ora `windgram_v2.py`
+    fa `from windgram.core.climb import climb_ceiling, SINK_RATE`. Golden identico (170577 char).
 - [ ] **C3** SPOSTA `aggregate` (+`_best_block`) da `windgram_v2.py` a
   `windgram/core/aggregate.py`. Golden invariato.
 
