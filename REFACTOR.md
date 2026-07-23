@@ -4,6 +4,20 @@ Documento di lavoro. Definisce la migrazione da 2 file monolitici a un'architett
 netti, **per piccoli passi**, ognuno committabile e **verificabile a output invariato**.
 Deciso con Giovanni il 2026-07-23. Vedi anche `DECISIONS.md` per le scelte di fondo.
 
+> ## ▶ STATO / RIPRENDERE DA QUI (2026-07-23)
+> Fatto: **A1, B1, C1, C2, C3, D1, E1, E2** (tutti pushati su `origin/main`, ultimo commit
+> `98ead9c`). Dati, fisica e contratto sono separati e testati; `windgram_arome.py` e' una
+> facciata di soli shim; niente piu' matplotlib/scipy.
+>
+> **Prossimo passo: E3a** (vedi checklist Fase E). E3 e' stato spezzato in 4 sotto-passi
+> (E3a-E3d) perche' e' il piu' delicato: far consumare il contratto al renderer, a golden
+> invariato.
+>
+> **Come riprendere in sicurezza**: prima di ogni modifica e dopo, lanciare
+> `py tools/snapshot.py` — deve stampare `[SVG] OK` e `[contratto] OK` (entrambi identici ai
+> golden). Se un passo cambia un golden senza volerlo, fermarsi. La fixture e i golden sono in
+> `tests/`. Ambiente: Windows, `py`, dipendenze runtime `requests numpy`.
+
 ## Obiettivo
 
 Separare nettamente:
@@ -140,9 +154,19 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
   - `tools/snapshot.py` esteso: verifica DUE golden (SVG + `forecast.json`) con input condivisi.
     Golden SVG invariato (170577), golden contratto creato (30356 char, 13 ore). `build_forecast`
     NON ancora usato dal renderer (quello e' E3).
-- [ ] **E3** Rifai `build_svg`/`build_chart` perché consumino il `Forecast` invece dei ~20
-  parametri sciolti. **Cambio a comportamento invariato**: stessi dati, solo re-impacchettati.
-  Golden SVG invariato. Commit isolato (è lo step più delicato).
+- **E3** Rifai `build_svg`/`build_chart` perché consumino il `Forecast` invece dei ~20 parametri
+  sciolti. Il piu' delicato → **spezzato in 4 sotto-passi**, ognuno a golden SVG invariato e con
+  commit proprio:
+  - [ ] **E3a** Sposta la costruzione del contratto in `main()`: `fisica → build_forecast →
+    render(forecast, …)`. Il contratto diventa l'INGRESSO del rendering; internamente il renderer
+    ancora ricalcola. Golden invariato.
+  - [ ] **E3b** `build_chart` usa `climb_top_m` e `wstar_slope_15min` DAL contratto invece di
+    ricalcolarli (rimuove la duplicazione `climb_ceiling`/`_slope` nel renderer). Golden invariato.
+  - [ ] **E3c** `build_chart` usa il profilo vento (`wind`) e il profilo lapse (`lapse`) dal
+    contratto, non piu' ricalcolati con `wind_profile`/`lapse_grid`. Golden invariato.
+  - [ ] **E3d** `build_chart`/`build_svg` leggono gli scalari per-ora (wstar, zi, lcl, superficie…)
+    dal contratto invece che dagli array sciolti. Firma finale: `render(forecast)`. Golden
+    invariato. Da qui il renderer non fa PIU' nessuna fisica.
 
 ### Fase F — Nuove superfici abilitate dal contratto
 - [ ] **F1** `windgram/render/json_api.py`: serializza il contratto (è di fatto il payload API).

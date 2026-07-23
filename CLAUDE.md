@@ -27,6 +27,26 @@ lancia Python con `py` (non `python`). Preferisce deliverable precisi e struttur
    verifica che codice, `CLAUDE.md`, wiki e `DECISIONS.md` siano ancora allineati fra loro —
    senza aspettare che l'utente lo chieda.
 
+## ⚠ REFACTORING A STRATI IN CORSO (leggere PRIMA di toccare il codice)
+
+Dal 2026-07-23 il progetto sta migrando da 2 file monolitici a un'architettura a strati
+(`windgram/sources` → `windgram/core` → `windgram/contract` → renderer). **Piano completo e punto
+di ripresa in [`REFACTOR.md`](REFACTOR.md)** — leggerlo prima di modificare.
+
+Stato: fatti A1–E2. **Prossimo passo: E3a.** In sintesi già oggi:
+- `windgram_arome.py` NON è più il monolite: è una **facciata di ~27 righe** (soli shim) che
+  ri-esporta da `windgram/sources/openmeteo.py` (dati) e `windgram/core/thermals.py` (fisica). Il
+  **rendering PNG v1 (matplotlib/scipy) è stato RITIRATO**.
+- La fisica vive in `windgram/core/` (`thermals.py`, `climb.py`, `aggregate.py`, `forecast.py`); il
+  **contratto** in `windgram/contract.py`. `windgram_v2.py` è ora presentazione + orchestrazione.
+- **Rete di sicurezza obbligatoria**: dopo ogni modifica lanciare `py tools/snapshot.py` — deve
+  stampare `[SVG] OK` e `[contratto] OK` (identici ai golden in `tests/golden/`).
+
+Le §3, §5, §7-§10 qui sotto descrivono correttamente COSA fa il codice (comportamento invariato dal
+refactoring) ma i riferimenti a *dove* vive una funzione vanno letti alla luce della nuova
+struttura. La risincronizzazione completa di CLAUDE.md/wiki con l'architettura finale è pianificata
+per la Fase G2 del refactoring.
+
 ---
 
 ## 1. Cos'è il progetto
@@ -38,11 +58,10 @@ sito di decollo **Piancavallo – Antenne Castaldia** (Prealpi Carniche, FVG), c
 Ispirato ai windgram RASP/FIVL (blipmap di DrJack / XCTherm-RegTherm), ricostruiti da dati
 del modello **ICON-D2 (~2.2 km)** via **API pubblica Open-Meteo** (gratuita, no key, CORS ok).
 
-Due deliverable:
-- **v1** `windgram_arome.py` — grafico tecnico PNG (matplotlib). Il file attualmente nella
-  cartella è la versione **COMPLETA** (~720 righe: motore dati/fisica + `plot()` + `main()` per
-  il rendering PNG) — vedi §3.
-- **v2** `windgram_v2.py` — **dashboard HTML+SVG** (cruscotto da pilota). È il focus attuale.
+Deliverable:
+- **v2** `windgram_v2.py` — **dashboard HTML+SVG** (cruscotto da pilota). È il deliverable attivo.
+- **v1** (grafico tecnico PNG matplotlib) — **RITIRATA** il 2026-07-23 (refactoring). Storicamente
+  stava in `windgram_arome.py`, che ora è solo una facciata di shim — vedi §3 e `REFACTOR.md`.
 
 ---
 
@@ -55,28 +74,31 @@ Produce `windgram.html` (un unico `<svg>` inline). Doppio clic = apre nel browse
 
 Argomenti: `--lat --lon --elev(auto DEM) --name --start --end --top-agl(5000) --model(icon_d2) --out`.
 
-Dipendenze: `requests numpy` (v2). La v1 completa richiede anche `matplotlib scipy`.
-`py -m pip install requests numpy` (aggiungere `matplotlib scipy` per v1 completa).
+Dipendenze runtime: **solo `requests numpy`** (`py -m pip install requests numpy`). Da quando la v1
+PNG è stata ritirata, `matplotlib`/`scipy` **non servono più**.
 
 ---
 
-## 3. File del progetto e stato
+## 3. File del progetto e stato (post-refactoring, aggiornato 2026-07-23)
 
-| File | Ruolo | Stato |
+| File / cartella | Ruolo | Stato |
 |------|-------|-------|
-| `windgram_arome.py` | Motore dati/fisica (fetch, parsing, calcoli termici) **+ rendering PNG completo** (`plot()`, `make_colormap`, `_cloud_path`, `_smooth`, `_draw_cb`, `main()`). ~720 righe. | Attivo, importato da v2 |
-| `windgram_v2.py` | Dashboard HTML+SVG. Importa `windgram_arome as W`. ~1140 righe. | In sviluppo attivo |
-| `windgram_v2_spec.md` | Specifica del layout v2 e mappatura dato→elemento | Non presente in cartella al momento — solo riferimento storico se ricreato |
+| `windgram/sources/openmeteo.py` | **Strato 0** — fetch/parsing Open-Meteo (`build_params, fetch, fetch_elevation, fetch_shf15, fetch_model_run, to_grid` + costanti `PLEVELS, HLEVELS, API, ELEV_API, META_PATH`). Solo `requests numpy`. | Attivo |
+| `windgram/core/thermals.py` | **Strato 1** — fisica (`lapse_grid, lcl_height, thermals, wind_profile, wind_samples, make_vscale`). Solo numpy. | Attivo |
+| `windgram/core/climb.py` | Strato 1 — `climb_ceiling, SINK_RATE` (quota realisticamente raggiungibile). | Attivo |
+| `windgram/core/aggregate.py` | Strato 1 — `aggregate, _best_block, _card16` (stelle, finestra, range). | Attivo |
+| `windgram/core/forecast.py` | `build_forecast(...)` — assembla il **contratto** dagli output fisica. | Attivo |
+| `windgram/contract.py` | **Strato 1.5** — dataclass `Forecast` v1.0 (+ `Meta/Hour/Surface/WindProfile/LapseProfile`) e (de)serializzazione JSON. | Attivo |
+| `windgram_v2.py` | **Renderer** dashboard HTML+SVG (`build_svg`, `build_chart`) + orchestrazione (`main`). Importa `windgram_arome as W` e i moduli `windgram.core.*`. | In sviluppo attivo |
+| `windgram_arome.py` | **Facciata di compatibilità** (~27 righe): ri-esporta i moduli sopra così `W.fetch`, `W.thermals`, ecc. restano invariati. La v1 PNG (matplotlib/scipy) è stata **rimossa**. | Shim, da assorbire in Fase G |
+| `tools/snapshot.py` · `tools/capture_fixture.py` | Rete di sicurezza del refactoring (golden SVG + contratto). | Attivi |
+| `tests/` | `fixtures/` (risposta Open-Meteo salvata), `golden/` (dashboard.svg + forecast.json), `test_contract.py`. | Attivi |
 
-**IMPORTANTISSIMO:** `windgram_v2.py` fa `import windgram_arome as W`. I due file DEVONO stare
-nella **stessa cartella**. Da `windgram_arome.py`, v2 usa solo il motore:
-`fetch, fetch_elevation, fetch_model_run, fetch_shf15, to_grid, lapse_grid, thermals,
-wind_profile, make_vscale` (+ costanti `PLEVELS, HLEVELS, API, ELEV_API`) — non tocca
-`plot()`/`main()`.
-Se in futuro si dovesse tornare a una versione "motore-only" senza matplotlib/scipy per alleggerire
-l'import in v2 (che oggi trascina comunque le dipendenze pesanti di v1 solo per importare il
-modulo), va isolata separatamente: **non dare per scontato che il file in cartella sia snello,
-verificare sempre con `grep "^def plot\|^def main" windgram_arome.py` prima di assumerlo.**
+**Rete di sicurezza**: dopo ogni modifica lanciare `py tools/snapshot.py` → deve stampare
+`[SVG] OK` e `[contratto] OK`. Vedi `REFACTOR.md` per il piano e il punto di ripresa (E3a).
+
+Nota storica: `windgram_arome.py` è stato a lungo un monolite di ~695 righe (dati+fisica+PNG). Non
+dare per scontato lo stato di un file: **verificare con `wc -l` / `grep "^def"` prima di assumere.**
 
 ---
 

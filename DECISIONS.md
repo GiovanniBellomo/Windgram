@@ -35,6 +35,8 @@ Due tabelle separate:
 | 2026-07-23 | Header: "Modello dati delle" → **"Modello dati aggiornato alle"** | Chiarezza ulteriore su cosa rappresenta l'orario mostrato. |
 | 2026-07-23 | **Refactoring a strati** (sources/core/contract/render) per piccoli passi, con rete di sicurezza golden-snapshot | Progetto cresciuto: strati entangled (fisica dentro il file di rendering). Obiettivo: multipiattaforma (mobile/WordPress), monetizzazione (API=contratto JSON), correzione statistica futura. Piano completo in `REFACTOR.md`. |
 | 2026-07-23 | **v1 PNG (matplotlib) RITIRATA** (eseguito in D1): rimossi `plot/make_colormap/_cloud_path/_smooth/_draw_cb/main` e gli import `matplotlib`/`scipy` da `windgram_arome.py` (ridotto a 27 righe di soli shim) | Confermato da Giovanni. Il rendering utile e' la dashboard SVG (v2); il PNG tecnico non serve piu' e trascinava matplotlib/scipy sull'intero progetto. Dipendenze runtime ora solo `requests numpy`. |
+| 2026-07-23 | **Contratto RICCO (opzione A)**: `Forecast` porta anche la fisica derivata (profilo vento risolto, profilo lapse, `wstar_slope_15min`, `climb_top`) | Scelto da Giovanni. E' l'unico modo per un confine netto vero: un consumatore (mobile/widget/API) disegna dal solo JSON, senza rifare fisica. `wstar_slope_15min` sta nel contratto perche' dipende dal dato a 15' (shf15), non ricavabile a valle dai soli scalari orari. |
+| 2026-07-23 | **E3 spezzato in 4 sotto-passi (E3a–E3d)** invece di un unico refactor del renderer | E3 (far consumare il contratto a build_svg/build_chart) e' il passo piu' delicato (~500 righe che ricalcolano fisica). Spezzarlo tiene ogni commit piccolo e a golden invariato. Dettaglio in `REFACTOR.md`. **Sessione fermata a E2, si riprende da E3a.** |
 
 ## Fatti
 
