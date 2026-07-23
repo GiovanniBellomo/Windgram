@@ -119,8 +119,17 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
     non servono piu'.
 
 ### Fase E — Il contratto (il passo cardine, isolato)
-- [ ] **E1** Definisci `windgram/contract.py`: dataclass `Forecast` v1.0 + `to_dict/from_dict/
+- [x] **E1** Definisci `windgram/contract.py`: dataclass `Forecast` v1.0 + `to_dict/from_dict/
   to_json`. Non ancora collegato. Test di round-trip (serializza→deserializza→uguale).
+  - **Contratto RICCO (opzione A)**, scelto da Giovanni: porta anche la fisica derivata che oggi
+    il renderer ricalcola — `WindProfile` (vento risolto alle quote native) e `LapseProfile`
+    (gradiente a strati per lo sfondo) — cosi' un consumatore disegna senza rifare fisica.
+  - Struttura: `Forecast{contract_version, Meta, hours[Hour{..., Surface, WindProfile,
+    LapseProfile}], aggregates}`. Tipi JSON-safe (float/int/str/bool/None/list/dict), niente
+    numpy/NaN (mancanti = `None`). `to_json(allow_nan=False)` fa fallire se resta un NaN.
+  - Test `tests/test_contract.py` (senza pytest, `py tests/test_contract.py`): round-trip
+    JSON/dict, invarianti None→null, indent. **Non ancora agganciato** al rendering (E2/E3).
+    Golden invariato (170577 char).
 - [ ] **E2** Aggiungi in `core/` una `build_forecast(...)` che assembla il contratto dagli output
   della fisica. Test: da fixture → contratto → golden JSON `tests/golden/forecast.json`.
 - [ ] **E3** Rifai `build_svg`/`build_chart` perché consumino il `Forecast` invece dei ~20
