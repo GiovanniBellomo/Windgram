@@ -4,6 +4,29 @@ Contesto per Claude Code. Leggere tutto prima di modificare il codice.
 L'utente (Giovanni) comunica in **italiano**, ambiente **Windows 11 + PowerShell**,
 lancia Python con `py` (non `python`). Preferisce deliverable precisi e strutturati.
 
+## Regole di lavoro permanenti (volute esplicitamente da Giovanni, 2026-07-23 — non derogabili)
+
+1. **Commit dopo ogni modifica al codice**, uno per cambio logico — non accumulare. Il push verso
+   `origin` va comunque confermato con l'utente (non è automatico). Vedi §15.
+2. **Documentazione sempre aggiornata, senza trascurare nulla**: `CLAUDE.md` (fonte primaria) e il
+   [Wiki GitHub](https://github.com/GiovanniBellomo/Windgram/wiki) (trasposizione human-friendly,
+   repo separato — vedi §16) vanno risincronizzati **ad ogni modifica rilevante**, non a fine
+   sessione. Se cambia qualcosa che tocca una sezione di CLAUDE.md, aggiornare anche la pagina
+   wiki corrispondente nello stesso giro di lavoro.
+3. **TODO / punti aperti sempre aggiornati** — §13 di questo file e la pagina wiki `TODO`. Quando
+   un punto viene chiuso, toglierlo; quando emerge un limite o un "andrebbe tarato", aggiungerlo
+   subito, non rimandare.
+4. **Commentare sempre il codice in italiano** (coerente con lo stile già presente in
+   `windgram_v2.py`/`windgram_arome.py`).
+5. **Tabella decisioni e fatti sempre aggiornata**: [`DECISIONS.md`](DECISIONS.md) — ogni scelta
+   di design non ovvia dal codice (con motivazione) e ogni fatto empirico scoperto (specialmente
+   su Open-Meteo/ICON-D2, spesso richiedono una verifica diretta per essere confermati) va
+   registrato lì, con la data. Non aspettare la fine della sessione.
+6. **Verifiche di coerenza periodiche**: a intervalli ragionevoli (dopo un batch corposo di
+   modifiche, o quando sono passate diverse sessioni), Claude propone di sua iniziativa una
+   verifica che codice, `CLAUDE.md`, wiki e `DECISIONS.md` siano ancora allineati fra loro —
+   senza aspettare che l'utente lo chieda.
+
 ---
 
 ## 1. Cos'è il progetto
@@ -324,6 +347,17 @@ limiti stelle, `flyscore>=0.65`. Calibrare su alcune giornate reali dell'utente.
    sul punto esatto (cambia con continuità anche spostando la query di poche decine di metri pur
    restando sulla stessa cella/nodo orario). La vera quota di orografia interna del modello per
    quella cella non è esposta dall'API e potrebbe scostarsi da 1098 m, specie su pendio ripido.
+8. **Quota realisticamente raggiungibile** (`climb_ceiling`, §5) — profilo di decadimento della
+   termica con la quota e soglia di affondo (`SINK_RATE=1.0`) scelti come approssimazione
+   ragionevole, **non tarati su voli reali**. Vedi §13.
+9. **Soglie di stelle/flyscore/palette termica** (§8, §9) — scelte ragionevoli ma non validate su
+   voli reali. Vedi §13.
+10. **"Prossimo aggiornamento dati"** in header — calcolato come corsa + 3h (ciclo nominale
+    ICON-D2), ma **non tiene conto del ritardo reale di pubblicazione** dei dati da parte di
+    Open-Meteo, che può essere di ore oltre il ciclo nominale. Verificato empiricamente il
+    2026-07-23 (vedi `DECISIONS.md`): alle 18:16 locali la corsa disponibile era ancora quella
+    delle 14:00, non delle 17:00 come la stima avrebbe promesso. Non è un bug dello script — è un
+    limite della stima, ancora da correggere (vedi §13).
 
 ---
 
@@ -356,6 +390,12 @@ il perché di una scelta specifica non ovvia dal codice.
 ## 13. TODO / prossimi passi
 
 - **Tarare** soglie stelle/flyscore su giornate reali (vedi §8) — non ancora fatto.
+- **Tarare** `SINK_RATE` e il coefficiente del profilo verticale in `climb_ceiling` (vedi §5) su
+  voli reali — non ancora fatto.
+- **Correggere la stima "Prossimo aggiornamento dati"** in header: oggi ignora il ritardo reale di
+  pubblicazione oltre il ciclo nominale di 3h (vedi §11 punto 10, e `DECISIONS.md` per la verifica
+  empirica del 2026-07-23). Opzioni discusse ma non decise: margine di sicurezza sulla stima,
+  oppure non promettere un orario preciso e mostrare "corsa vecchia di N ore".
 - Valutare direzione vento "ora di punta" vs media vettoriale.
 - Eventuale confronto multi-modello (ICON-D2 vs ICON-2I) affiancato.
 - Etichetta "TOP TERMICA OPERATIVO" dentro il plot (mai aggiunta, solo in legenda/sidebar).
@@ -381,12 +421,10 @@ funzione Wiki — su piano gratuito il Wiki richiede repo pubblico):
 
 `.gitignore` esclude: output generati (`*.html`, `*.png` — rigenerabili da codice + dati live,
 non ha senso versionarli) e `.claude/` (config locale di Claude Code, specifica della macchina).
-Restano tracciati: `windgram_v2.py`, `windgram_arome.py`, `CLAUDE.md`, `Esecuzione.txt`.
+Restano tracciati: `windgram_v2.py`, `windgram_arome.py`, `CLAUDE.md`, `DECISIONS.md`,
+`Esecuzione.txt`.
 
-**Regola permanente (voluta esplicitamente da Giovanni il 2026-07-23): committare dopo OGNI
-modifica al codice**, non accumulare più cambi in un commit unico — lo storico deve restare
-leggibile e granulare. Non aspettare che l'utente lo richieda ogni volta. Il push verso `origin`
-NON è automatico — va confermato con l'utente come per qualsiasi azione che pubblica qualcosa.
+Regola di commit/push: vedi le **Regole di lavoro permanenti** in cima a questo file.
 
 ## 16. Wiki del progetto
 
