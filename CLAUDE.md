@@ -65,7 +65,7 @@ Dipendenze: `requests numpy` (v2). La v1 completa richiede anche `matplotlib sci
 | File | Ruolo | Stato |
 |------|-------|-------|
 | `windgram_arome.py` | Motore dati/fisica (fetch, parsing, calcoli termici) **+ rendering PNG completo** (`plot()`, `make_colormap`, `_cloud_path`, `_smooth`, `_draw_cb`, `main()`). ~720 righe. | Attivo, importato da v2 |
-| `windgram_v2.py` | Dashboard HTML+SVG. Importa `windgram_arome as W`. ~1135 righe. | In sviluppo attivo |
+| `windgram_v2.py` | Dashboard HTML+SVG. Importa `windgram_arome as W`. ~1140 righe. | In sviluppo attivo |
 | `windgram_v2_spec.md` | Specifica del layout v2 e mappatura dato→elemento | Non presente in cartella al momento — solo riferimento storico se ricreato |
 
 **IMPORTANTISSIMO:** `windgram_v2.py` fa `import windgram_arome as W`. I due file DEVONO stare
@@ -160,10 +160,12 @@ palette morbida. Sei zone:
 - **Header** (y 0-86, full): a sinistra nome sito (maiuscolo grande) e sotto, in blu/bold,
   **"Altitudine {elev} m slm"** (il vecchio nome modello è stato tolto da qui, resta solo nel
   footer). Al centro data estesa IT + periodo. A destra **testo pulito senza box scuro**,
-  allineato a destra, 3 righe in **ora locale Europe/Rome** (mai UTC in header): **"Modello dati
-  delle HH:MM"** (corsa modello — rinominato da "Aggiornato alle", più chiaro che è l'orario della
-  corsa e non un refresh dei dati), "Prossimo aggiornamento dati: HH:MM" (corsa + 3 h, ciclo
-  ICON-D2), "Grafico generato alle HH:MM" (ora di esecuzione dello script).
+  allineato a destra, 2 righe in **ora locale Europe/Rome** (mai UTC in header): **"Modello dati
+  aggiornato alle HH:MM"** (corsa modello — rinominato da "Aggiornato alle" poi da "Modello dati
+  delle", più chiaro che è l'orario della corsa e non un refresh dei dati), "Grafico generato alle
+  HH:MM" (ora di esecuzione dello script). La riga "Prossimo aggiornamento dati" (corsa + 3h) è
+  stata **rimossa** (non aggiunta di nuovo): la stima non è affidabile, ignora il ritardo reale di
+  pubblicazione — vedi `DECISIONS.md` e §11 punto 10.
 - **Colonna sinistra** (x 24-274, y 100-824): card **"STIMA GIORNATA"** (rinominata da "RIASSUNTO
   GIORNATA" — meno assertiva, segnala che è una previsione). Badge navy in testa; **stelle**
   grandi centrate (il giudizio testuale tipo "Molto buone" è stato **rimosso**, troppo assertivo
@@ -180,9 +182,10 @@ palette morbida. Sei zone:
   `wbar` verde→rosso per ora). La barra è SEPARATA dal plot. (La vecchia scritta "corsa" in rosso
   accanto al titolo è stata rimossa da qui — resta solo nel footer.)
 - **Colonna destra** (x 1204-1476, y 100-969, fino in fondo, bottom allineato alla tabella):
-  3 box — **LEGENDA** (top termica, copertura cumuli %, sviluppo verticale, **zero termico
-  stimato** — nuova voce, linea azzurro ghiaccio; la voce "Base cumuli LCL" è stata tolta insieme
-  alla banda tratteggiata che rappresentava, rimossa dal grafico), **GRADIENTE TERMICO** (scala
+  3 box — **LEGENDA** (quota raggiungibile, copertura cumuli %, sviluppo verticale, zero termico
+  stimato — 4 voci; la voce "Top termica operativo" è stata tolta insieme alla linea che
+  rappresentava, rimossa dal grafico il 2026-07-23; la voce "Base cumuli LCL" era già stata tolta
+  in precedenza insieme alla banda tratteggiata che rappresentava), **GRADIENTE TERMICO** (scala
   qualitativa a bande, palette aggiornata — vedi §9), **VENTO** (legenda barbe).
 - **Tabella** (x 24-1188, y 838-969): 3 righe con icona ed etichetta. **Le colonne numeriche sono
   allineate alle ore del grafico**: `TX(j)` usa la funzione condivisa `hour_x(px, pw, nt, j)` —
@@ -228,14 +231,22 @@ palette morbida. Sei zone:
   (copertura % + bonus se sovrasviluppo), con un tetto al 90% della larghezza della testa (non
   supera mai la base). L'etichetta della quota base è ora piccola e normale (10px, `MUTE`, peso
   normale) — stessa formattazione di quella della cima, non più blu/bold.
-- **Linea "top termica operativo"** (`work_top`): **non più rosa fissa** — colorata con un vero
-  `<linearGradient>` SVG (colore + trasparenza continui, non a tratti/blocchi) in base al W\* di
-  ogni ora, vedi §9/§10 per i dettagli. Solo la linea liscia, **niente pallini né etichette
-  numeriche per ogni ora** (aggiunti in un round di modifiche, poi tolti su richiesta esplicita
-  perché disorientavano).
-- **Linea "zero termico stimato"** (nuova): quota isoterma 0°C da `freezing_level_height`
-  (`surf["fzl"]`), stesso stile della linea rosa (path liscio, stroke 3.4, capo arrotondato) ma
-  colore **azzurro ghiaccio** (`ICE = "#6fd0ea"`).
+- **Linea "top termica operativo"** (`work_top`, soffitto meteorologico) — **rimossa
+  completamente dal grafico e dalla legenda** (2026-07-23): dato ritenuto inutile da visualizzare,
+  sovrastimava sistematicamente la quota raggiungibile reale (vedi `climb_ceiling` in §5). Il dato
+  del modello resta comunque calcolato e disponibile (`work_top` da `thermals()`) — usato in
+  sidebar per la card "TOP TERMICA" (§8) — solo non più disegnato come linea nel plot.
+- **Linea "quota raggiungibile"** (`climb_ceiling`): colorata con un vero `<linearGradient>` SVG
+  (colore + trasparenza continui, non a tratti/blocchi) in base al W\* di ogni ora, vedi §9/§10
+  per i dettagli. Solo la linea liscia, **niente pallini né etichette numeriche per ogni ora**
+  (aggiunti in un round di modifiche, poi tolti su richiesta esplicita perché disorientavano).
+- **Linea "zero termico stimato"**: quota isoterma 0°C da `freezing_level_height`
+  (`surf["fzl"]`). **In secondo piano** rispetto a tutti gli altri simboli del grafico (griglia,
+  barbe, nuvole, etichette) — disegnata subito dopo lo sfondo, prima di tutto il resto, così non
+  compete mai con i dati operativi. Stile: sottile (`stroke-width=1.6`, era 3.4), **tratteggiata**
+  (`stroke-dasharray="5 4"`) e semi-trasparente (`stroke-opacity=0.7`), colore azzurro ghiaccio
+  (`ICE = "#6fd0ea"`). Un **fiocco di neve** (`ic_snowflake`, 3 assi incrociati) segna ogni ora
+  sopra la linea, per restarne leggibile anche così in secondo piano.
 - **Barre di pioggia** (nuove): per ogni ora con `precipitation > 0.05 mm`, una barra verticale
   **azzurra** (`RAIN = "#3f9bdb"`, semi-trasparente) dalla **sommità del plot** verso il basso;
   **profondità** proporzionale all'intensità relativa al massimo della giornata; **larghezza
@@ -287,10 +298,12 @@ limiti stelle, `flyscore>=0.65`. Calibrare su alcune giornate reali dell'utente.
   **qualitativa a bande** (`GRAD_CLASSES`, stessi hex dei relativi stop): Instabile >0.9 rosso,
   Buona 0.65-0.9 arancio, Moderata 0.32-0.65 verde-giallo, Debole 0-0.32 verde, Stabile <0 blu.
 - **Intensità W\*** (barra in cima): `WSTAR_STOPS` verde(0)→…→rosso(2.4) (`wstar_color`).
-- **Intensità termica della linea "top termica"** (`THERM_CLASSES`/`THERM_STOPS`, `therm_color`):
-  5 control point sugli STESSI colori di `GRAD_CLASSES` (in ordine crescente zero→molto forte:
-  blu→verde→verde-giallo→arancio→rosso), classificati per W\* in m/s — `0.0-0.5` Zero,
-  `0.5-1.0` Debole, `1.0-2.0` Sfruttabile, `2.0-4.0` Forte, `>4.0` Molto forte. `therm_color(w)`
+- **Intensità termica della linea "quota raggiungibile"** (`THERM_CLASSES`/`THERM_STOPS`,
+  `therm_color`): 5 control point sugli STESSI colori di `GRAD_CLASSES` (in ordine crescente
+  zero→molto forte: blu→verde→verde-giallo→arancio→rosso), classificati per W\* in m/s —
+  `0.0-0.5` Zero, `0.5-1.0` Debole, `1.0-2.0` Sfruttabile, `2.0-3.0` Forte, `>3.0` Molto forte
+  (soglia del rosso abbassata da 4.0 a 3.0 il 2026-07-23, il vecchio limite era quasi mai
+  raggiunto nella pratica). `therm_color(w)`
   interpola con continuità tra i control point (stessa tecnica RGB di `grad_color`/`wstar_color`),
   NON sceglie un colore a blocchi: la linea è disegnata come un unico `<linearGradient>`
   orizzontale con uno `<stop>` esatto ad ogni ora (`x = X(j)`, colore `therm_color(wstar[j])`),
@@ -353,12 +366,12 @@ limiti stelle, `flyscore>=0.65`. Calibrare su alcune giornate reali dell'utente.
    ragionevole, **non tarati su voli reali**. Vedi §13.
 9. **Soglie di stelle/flyscore/palette termica** (§8, §9) — scelte ragionevoli ma non validate su
    voli reali. Vedi §13.
-10. **"Prossimo aggiornamento dati"** in header — calcolato come corsa + 3h (ciclo nominale
-    ICON-D2), ma **non tiene conto del ritardo reale di pubblicazione** dei dati da parte di
-    Open-Meteo, che può essere di ore oltre il ciclo nominale. Verificato empiricamente il
-    2026-07-23 (vedi `DECISIONS.md`): alle 18:16 locali la corsa disponibile era ancora quella
-    delle 14:00, non delle 17:00 come la stima avrebbe promesso. Non è un bug dello script — è un
-    limite della stima, ancora da correggere (vedi §13).
+10. **"Prossimo aggiornamento dati"** — la stima (corsa + 3h nominali ICON-D2) **non teneva conto
+    del ritardo reale di pubblicazione** dei dati da parte di Open-Meteo, che può essere di ore
+    oltre il ciclo nominale. Verificato empiricamente il 2026-07-23 (vedi `DECISIONS.md`): alle
+    18:16 locali la corsa disponibile era ancora quella delle 14:00, non delle 17:00 come la stima
+    avrebbe promesso. **Risolto rimuovendo la riga dall'header** (2026-07-23) invece di correggere
+    la stima — non c'era un modo affidabile di calcolarla con i dati esposti dall'API.
 
 ---
 
@@ -384,22 +397,37 @@ GIORNATA", aggiunta stima quota massima cumuli.
 **Terza fase, sessione 2026-07-22/23**: la linea "top termica operativo" non è più a tinta rosa
 fissa — colorata con un `<linearGradient>` SVG continuo (colore + trasparenza) in base al W\* di
 ogni ora (vedi §9/§10, `therm_color`/`therm_opacity`); header "Aggiornato alle"→"Modello dati
-delle" (meno ambiguo); footer con coordinate GPS aggiunte in fondo. **Dettaglio completo nella
-memoria di progetto** `windgram_v2_ui_overhaul_2026-07-22` (auto-memory) — consultarla se serve
-il perché di una scelta specifica non ovvia dal codice.
+delle" (meno ambiguo); footer con coordinate GPS aggiunte in fondo.
+
+**Quarta fase, sessione 2026-07-23**: introdotta `climb_ceiling` come linea separata da
+`work_top` (quota realisticamente raggiungibile, tiene conto dell'affondo dell'ala e del profilo
+di indebolimento della termica con la quota — eredita il linguaggio colore/trasparenza che prima
+era sulla linea del soffitto); soglia colore "rosso" spostata da W\*≥4 a W\*≥3; finestra di calcolo
+della stabilità ridotta da ±1h a ±15'; parametri `mag` ricalibrati (0.15-0.5 sotto W\*=1, 0.5-1.0
+fino a W\*=2.5); **flusso di calore reale a 15'** (`fetch_shf15`) per rifinire il W\* locale nel
+calcolo di stabilità, con un bug trovato e corretto (interpolava `boundary_layer_height` grezzo,
+spesso NaN, invece di riusare `zi` già risolto); minimo di opacità portato a 0 (era 0.12), con
+`W*≤0 → opacità 0` esplicito. Inizializzato il repository **git**, poi reso pubblico su GitHub e
+collegato a un **Wiki** (`https://github.com/GiovanniBellomo/Windgram/wiki`, trasposizione
+human-friendly di questo file). Introdotte le **regole di lavoro permanenti** in cima a questo
+file e la tabella `DECISIONS.md`. Dettaglio completo di ogni scelta con motivazione: `DECISIONS.md`.
+
+**Quinta fase, sessione 2026-07-23**: la linea "top termica operativo" (`work_top`) è stata
+**rimossa completamente** dal grafico e dalla legenda (dato ritenuto inutile da visualizzare, il
+dato del modello resta comunque disponibile per la sidebar); la linea "zero termico stimato" è
+stata spostata **in secondo piano** (disegnata subito dopo lo sfondo, prima di griglia/barbe/
+nuvole/etichette), resa più sottile, tratteggiata, semi-trasparente (`stroke-opacity=0.7`), con
+un'icona a fiocco di neve (`ic_snowflake`) ad ogni ora per restare leggibile; rimossa la riga
+"Prossimo aggiornamento dati" in header (stima inaffidabile, vedi §11 punto 10); "Modello dati
+delle"→"Modello dati aggiornato alle".
 
 ## 13. TODO / prossimi passi
 
 - **Tarare** soglie stelle/flyscore su giornate reali (vedi §8) — non ancora fatto.
 - **Tarare** `SINK_RATE` e il coefficiente del profilo verticale in `climb_ceiling` (vedi §5) su
   voli reali — non ancora fatto.
-- **Correggere la stima "Prossimo aggiornamento dati"** in header: oggi ignora il ritardo reale di
-  pubblicazione oltre il ciclo nominale di 3h (vedi §11 punto 10, e `DECISIONS.md` per la verifica
-  empirica del 2026-07-23). Opzioni discusse ma non decise: margine di sicurezza sulla stima,
-  oppure non promettere un orario preciso e mostrare "corsa vecchia di N ore".
 - Valutare direzione vento "ora di punta" vs media vettoriale.
 - Eventuale confronto multi-modello (ICON-D2 vs ICON-2I) affiancato.
-- Etichetta "TOP TERMICA OPERATIVO" dentro il plot (mai aggiunta, solo in legenda/sidebar).
 
 ## 14. Gotchas operativi
 

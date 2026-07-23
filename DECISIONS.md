@@ -29,6 +29,10 @@ Due tabelle separate:
 | 2026-07-23 | Header: "Aggiornato alle" → **"Modello dati delle"** | La vecchia dicitura suggeriva un refresh live, mentre è l'orario della corsa del modello. |
 | 2026-07-23 | Repository git creato, poi reso **pubblico** su GitHub | Necessario per sbloccare la funzione Wiki nativa di GitHub su piano gratuito (i repo privati non la supportano). Rischio valutato: nessun segreto nel codice, coordinate GPS del decollo già pubbliche (sito FIVL/XCTherm noto); unico costo reale è nome+email dell'autore visibili nella cronologia commit. |
 | 2026-07-23 | Regola permanente: **commit dopo ogni modifica**, **documentazione (CLAUDE.md + wiki) sempre aggiornata**, **commenti sempre in italiano**, **verifiche di coerenza periodiche proposte da Claude** | Richiesta esplicita di Giovanni — il progetto è cresciuto molto e serve disciplina per non perdere storico/contesto. |
+| 2026-07-23 | Linea "top termica operativo" (`work_top`) **rimossa completamente** dal grafico e dalla legenda | Richiesta esplicita — dato ritenuto inutile da visualizzare (sovrastimava la raggiungibilità reale, `climb_ceiling` la sostituisce già come informazione). Il dato del modello resta comunque calcolato/disponibile per la sidebar. |
+| 2026-07-23 | Linea "zero termico stimato" spostata **in secondo piano** (disegnata subito dopo lo sfondo, prima di griglia/barbe/nuvole/etichette), resa sottile/tratteggiata/semi-trasparente (opacità 0.7), con icona a fiocco di neve ad ogni ora | Richiesta esplicita — è un riferimento di massima, non deve competere visivamente con i dati operativi; il fiocco di neve la mantiene individuabile anche così. |
+| 2026-07-23 | Rimossa la riga "Prossimo aggiornamento dati" dall'header (non corretta la stima) | La stima (corsa+3h) non è affidabile — vedi Fatti sotto — e non c'è modo di calcolarla in modo affidabile con i dati esposti dall'API. Meglio niente che un orario spesso sbagliato. |
+| 2026-07-23 | Header: "Modello dati delle" → **"Modello dati aggiornato alle"** | Chiarezza ulteriore su cosa rappresenta l'orario mostrato. |
 
 ## Fatti
 

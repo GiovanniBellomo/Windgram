@@ -48,7 +48,7 @@ RAIN = "#3f9bdb"
 INK = "#1b2a4a"
 MUTE = "#5a6b86"
 
-# classi di intensita' termica (W*, m/s) per la linea "top termica operativo":
+# classi di intensita' termica (W*, m/s) per la linea "quota raggiungibile":
 # stessi 5 colori della legenda GRADIENTE TERMICO (presi da GRAD_CLASSES, qui in
 # ordine crescente zero->molto forte) cosi' le due scale restano coerenti.
 # Usate come CONTROL POINT per un gradiente continuo (`therm_color`), non a
@@ -472,7 +472,7 @@ def climb_ceiling(elev, zi, lcl, wstar, sink_rate=SINK_RATE):
     return top
 
 
-def build_chart(times, levels, hwind, surf, elev, zi, wstar, lcl, work_top,
+def build_chart(times, levels, hwind, surf, elev, zi, wstar, lcl,
                 overdev, top_agl, geom, shf15=None):
     px, py, pw, ph = geom
     nt = len(times)
@@ -532,6 +532,22 @@ def build_chart(times, levels, hwind, surf, elev, zi, wstar, lcl, work_top,
                   f'height="{ph:.1f}" fill="url(#{gid})" fill-opacity="0.5"/>')
     body.append(f'<g filter="url(#hblur)" clip-path="url(#plotclip)">'
                 f'{"".join(bg)}</g>')
+
+    # --- zero termico stimato (quota isoterma 0 gradi) ---
+    # disegnata subito dopo lo sfondo, PRIMA di griglia/barbe/nuvole/etichette:
+    # resta in secondo piano, un riferimento di massima che non deve competere
+    # con i dati operativi. Tratteggiata, sottile e semi-trasparente per lo
+    # stesso motivo; i fiocchi di neve a ogni ora restano leggibili anche così.
+    fzl = surf.get("fzl")
+    if fzl is not None:
+        pts_fzl = [(X(j), Yz(fzl[j])) for j in range(nt) if not np.isnan(fzl[j])]
+        if len(pts_fzl) >= 2:
+            body.append(f'<path d="{smooth_path(pts_fzl)}" fill="none" stroke="{ICE}" '
+                        f'stroke-width="1.6" stroke-linecap="round" stroke-opacity="0.7" '
+                        f'stroke-dasharray="5 4"/>')
+            for j in range(nt):
+                if not np.isnan(fzl[j]):
+                    body.append(ic_snowflake(X(j), Yz(fzl[j])))
 
     # --- griglia + etichette Y (m slm) ---
     first50 = int(np.ceil((elev + 40) / 50.0) * 50)
@@ -659,21 +675,11 @@ def build_chart(times, levels, hwind, surf, elev, zi, wstar, lcl, work_top,
         body.append(txt(X(j), yb + head * 0.32 + 15, f"{int(round(base/10)*10)} m", 10,
                         MUTE, "normal", "middle"))
 
-    # --- top termica operativo: soffitto METEOROLOGICO (zi/lcl), linea piena ---
-    # tinta unica come in origine: e' il tetto teorico del modello, non una stima
-    # di raggiungibilita' -- quella e' la seconda linea qui sotto.
-    pts = [(X(j), Yz(work_top[j])) for j in range(nt) if not np.isnan(work_top[j])]
-    if len(pts) >= 2:
-        # TEMPORANEO: trasparenza 100% su richiesta (stroke-opacity="0") --
-        # ripristinare rimuovendo l'attributo quando non serve piu' nasconderla.
-        body.append(f'<path d="{smooth_path(pts)}" fill="none" stroke="{PINK}" '
-                    f'stroke-width="3.4" stroke-linecap="round" stroke-opacity="0"/>')
-
     # --- quota realisticamente raggiungibile: gradiente SVG continuo ---
     # tiene conto dell'affondo dell'ala (SINK_RATE) e di come la termica si
-    # indebolisce salendo verso zi (climb_ceiling), sempre <= work_top. Usa lo
-    # stesso linguaggio visivo (colore=intensita', trasparenza=stabilita') gia'
-    # validato: un vero <linearGradient>, un colore/opacita' "puro" esattamente
+    # indebolisce salendo verso zi (climb_ceiling). Usa lo stesso linguaggio
+    # visivo (colore=intensita', trasparenza=stabilita') gia' validato: un vero
+    # <linearGradient>, un colore/opacita' "puro" esattamente
     # ad ogni ora, sfumato con continuita' verso le ore vicine, senza gradini.
     climb_top = np.array([climb_ceiling(elev, zi[j], lcl[j], wstar[j])
                           for j in range(nt)])
@@ -744,14 +750,6 @@ def build_chart(times, levels, hwind, surf, elev, zi, wstar, lcl, work_top,
                     f'{"".join(gstops)}</linearGradient>')
         body.append(f'<path d="{smooth_path(pts2)}" fill="none" stroke="url(#thermgrad)" '
                     f'stroke-width="3.4" stroke-linecap="round"/>')
-
-    # --- zero termico stimato (quota isoterma 0 gradi) ---
-    fzl = surf.get("fzl")
-    if fzl is not None:
-        pts_fzl = [(X(j), Yz(fzl[j])) for j in range(nt) if not np.isnan(fzl[j])]
-        if len(pts_fzl) >= 2:
-            body.append(f'<path d="{smooth_path(pts_fzl)}" fill="none" stroke="{ICE}" '
-                        f'stroke-width="3.4" stroke-linecap="round"/>')
 
     # --- pioggia: barra verticale dalla sommita' del plot, una per ora ---
     # il dato e' un accumulo orario (niente sotto-orario): la larghezza resta
@@ -829,10 +827,23 @@ def ic_thermo(cx, cy, col="#d8433a"):
             f'<rect x="-1.4" y="-4" width="2.8" height="10" rx="1.4" fill="{col}"/></g>')
 
 
+def ic_snowflake(cx, cy, r=5.0, col=ICE):
+    """Fiocco di neve stilizzato (3 assi incrociati, 6 punte): segna ogni ora
+    sulla linea "zero termico stimato" per restare leggibile anche se sottile,
+    tratteggiata e in secondo piano rispetto agli altri simboli del grafico."""
+    out = []
+    for i in range(3):
+        ang = np.deg2rad(i * 60)
+        dx, dy = r * np.cos(ang), r * np.sin(ang)
+        out.append(f'<line x1="{cx-dx:.1f}" y1="{cy-dy:.1f}" x2="{cx+dx:.1f}" y2="{cy+dy:.1f}" '
+                   f'stroke="{col}" stroke-width="1.1" stroke-linecap="round"/>')
+    return "".join(out)
+
+
 # =========================================================================== #
-def build_svg(times, levels, hwind, surf, elev, zi, wstar, lcl, work_top,
+def build_svg(times, levels, hwind, surf, elev, zi, wstar, lcl,
               overdev, agg, name, model_label, run_label, top_agl,
-              date_str, period_str, run_time_str, next_run_str, gen_time_str,
+              date_str, period_str, run_time_str, gen_time_str,
               lat, lon, shf15=None):
     Wpx, Hpx = 1500, 1000
     defs = ['<filter id="sh" x="-20%" y="-20%" width="140%" height="140%">'
@@ -846,10 +857,12 @@ def build_svg(times, levels, hwind, surf, elev, zi, wstar, lcl, work_top,
     S.append(txt(28, 72, f"Altitudine {int(elev)} m slm", 15, BLUEC, "bold"))
     S.append(txt(620, 40, date_str, 20, INK, "bold", "start"))
     S.append(txt(620, 66, period_str, 14, MUTE))
-    # orari corsa modello, pulito (senza box scuro), allineato a destra
-    S.append(txt(1476, 34, f"Modello dati delle {run_time_str}", 14, INK, "bold", "end"))
-    S.append(txt(1476, 52, f"Prossimo aggiornamento dati: {next_run_str}", 12, MUTE, "normal", "end"))
-    S.append(txt(1476, 70, f"Grafico generato alle {gen_time_str}", 12, MUTE, "normal", "end"))
+    # orari corsa modello, pulito (senza box scuro), allineato a destra.
+    # "Prossimo aggiornamento" rimossa: la stima (corsa + 3h nominali) non e'
+    # affidabile, ignora il ritardo reale di pubblicazione dei dati (vedi
+    # DECISIONS.md) -- meglio non promettere un orario che spesso e' sbagliato.
+    S.append(txt(1476, 40, f"Modello dati aggiornato alle {run_time_str}", 14, INK, "bold", "end"))
+    S.append(txt(1476, 62, f"Grafico generato alle {gen_time_str}", 12, MUTE, "normal", "end"))
 
     # ---- COLONNA SINISTRA ----
     lx, lw = 24, 250
@@ -939,7 +952,7 @@ def build_svg(times, levels, hwind, surf, elev, zi, wstar, lcl, work_top,
     S.append(rrect(px, bar_y, pw, bar_h, 4, "url(#wbar)", "#c9d0da", 0.8))
 
     cdefs, cbody = build_chart(times, levels, hwind, surf, elev, zi, wstar, lcl,
-                               work_top, overdev, top_agl, geom, shf15)
+                               overdev, top_agl, geom, shf15)
     defs.append(cdefs)
     S.append(cbody)
 
@@ -954,10 +967,6 @@ def build_svg(times, levels, hwind, surf, elev, zi, wstar, lcl, work_top,
     S.append(txt(rx + 22, b1 + 34, "LEGENDA", 14, INK, "bold",
                  extra='letter-spacing="0.5"'))
     ly = b1 + 78
-    S.append(f'<line x1="{rx+22}" y1="{ly}" x2="{rx+58}" y2="{ly}" stroke="{PINK}" '
-             f'stroke-width="3.6" stroke-linecap="round"/>')
-    S.append(txt(rx + 70, ly + 4, "Top termica operativo", 12, INK))
-    ly += 34
     tstops = "".join(f'<stop offset="{(lo/THERM_STOPS[-1][0]):.3f}" stop-color="{col}"/>'
                      for lo, col in THERM_STOPS)
     defs.append(f'<linearGradient id="thermleg" x1="{rx+22}" y1="0" x2="{rx+58}" y2="0" '
@@ -1098,11 +1107,9 @@ def main():
         age = (dt.datetime.now(dt.timezone.utc) - init).total_seconds() / 3600
         run_label = f"corsa {init:%d %b %H:%M} UTC ({age:.0f} h fa)"
         run_time_str = f"{init.astimezone(ROME_TZ):%H:%M}"
-        # ICON-D2 gira ogni 3 h (00/03/06/.../21 UTC)
-        next_run_str = f"{(init + dt.timedelta(hours=3)).astimezone(ROME_TZ):%H:%M}"
     else:
         run_label = None
-        run_time_str = next_run_str = "n/d"
+        run_time_str = "n/d"
     gen_time_str = f"{dt.datetime.now(ROME_TZ):%H:%M}"
 
     labels_map = {"icon_d2": "ICON-D2 · 2.2 km",
@@ -1116,9 +1123,9 @@ def main():
     date_str = f"{wd[d0.weekday()].capitalize()} {d0.day} {months[d0.month]} {d0.year}"
     period_str = f"{args.start:02d}:00 - {args.end:02d}:00 (ora locale)"
 
-    svg = build_svg(times, levels, hwind, surf, elev, zi, wstar, lcl, work_top,
+    svg = build_svg(times, levels, hwind, surf, elev, zi, wstar, lcl,
                     overdev, agg, args.name, model_label, run_label, args.top_agl,
-                    date_str, period_str, run_time_str, next_run_str, gen_time_str,
+                    date_str, period_str, run_time_str, gen_time_str,
                     args.lat, args.lon, shf15)
     page = (f'<!doctype html><html lang="it"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'
