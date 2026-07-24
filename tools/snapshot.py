@@ -25,12 +25,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np  # noqa: E402
-import windgram_v2 as V  # noqa: E402
 from windgram.sources.openmeteo import to_grid  # noqa: E402
 from windgram.core.thermals import thermals  # noqa: E402
 from windgram.core.aggregate import aggregate  # noqa: E402
 from windgram.core.forecast import build_forecast  # noqa: E402
 from windgram.render.json_api import render_json  # noqa: E402
+from windgram.render.svg import build_svg  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURE = os.path.join(ROOT, "tests", "fixtures", "piancavallo_icon_d2.json")
@@ -90,7 +90,7 @@ def build_svg_from_fixture():
     # E3d: il renderer consuma SOLO il contratto -> render(forecast). Le stringhe
     # di intestazione (data IT, orari corsa/generazione) le deriva build_svg dai
     # metadati del contratto, non le passa piu' il chiamante.
-    return V.build_svg(_forecast_from_inputs(_load_inputs()))
+    return build_svg(_forecast_from_inputs(_load_inputs()))
 
 
 def build_forecast_json_from_fixture():
