@@ -13,11 +13,11 @@ Deciso con Giovanni il 2026-07-23. Vedi anche `DECISIONS.md` per le scelte di fo
 > di intestazione (data IT, orari corsa/generazione, etichetta modello) le DERIVA il renderer dai
 > metadati del contratto.
 >
-> **Prossimo passo: G1** (struttura finale `windgram/` + rimozione shim). **Fase F COMPLETA**
-> (F1 renderer JSON, F2 log storico a costo zero). Nota tecnica da G1: togliere l'import morto
-> `climb_ceiling`/`SINK_RATE` da `windgram_v2.py` (ora solo nei commenti). E3d aveva aggiornato il
-> golden `forecast.json` in UN campo (`generated_utc` 17:09 -> 17:00) per auto-coerenza dell'harness
-> -- l'SVG golden e' rimasto byte-identico (170577 char).
+> **Prossimo passo: G2** (resync doc: CLAUDE.md, wiki, DECISIONS.md + pagina wiki su architettura a
+> strati e formato del contratto). **G1 COMPLETA** (a/b/c): shim rimosso, rendering in
+> `windgram/render/svg.py`, orchestrazione in `windgram/cli.py`, `windgram_v2.py` = lanciatore
+> sottile. **Layout target raggiunto.** L'unica cosa che resta e' allineare la documentazione al
+> codice (§3 di CLAUDE.md descrive ancora la struttura pre-G1).
 >
 > **Come riprendere in sicurezza**: prima di ogni modifica e dopo, lanciare
 > `py tools/snapshot.py` — deve stampare `[SVG] OK` e `[contratto] OK` (entrambi identici ai
@@ -216,9 +216,19 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
     invariati (main non e' nel path dello snapshot).
 
 ### Fase G — Struttura finale e pulizia
-- [ ] **G1** Sposta i file nel layout `windgram/` definitivo, aggiorna gli import, rimuovi gli shim
+- [x] **G1** Sposta i file nel layout `windgram/` definitivo, aggiorna gli import, rimuovi gli shim
   quando nessuno usa più i percorsi vecchi. Mantieni l'entry-point `windgram_v2.py` alla radice
   come lanciatore sottile. Golden invariato.
+  - **G1a**: rimosso lo shim `windgram_arome.py`; `windgram_v2`/`tools` importano diretto da
+    `windgram.sources.openmeteo` e `windgram.core.*`. Tolto l'import morto `climb_ceiling`/`SINK_RATE`.
+  - **G1b**: rendering estratto in `windgram/render/svg.py` (build_svg/build_chart + helper + icone +
+    costanti colore + `_narr` + `_MONTHS/_WD/_MODEL_LABELS` + `ROME_TZ`). `tools/snapshot.py` importa
+    `build_svg` da `render.svg`.
+  - **G1c**: orchestrazione (`main`, `write_history`) spostata in `windgram/cli.py`; `windgram_v2.py`
+    e' ora un lanciatore di ~12 righe (`from windgram.cli import main`). Funziona sia
+    `py windgram_v2.py ...` sia `py -m windgram.cli ...`. `_DEFAULT_HISTORY` calcolato dalla radice
+    del progetto (parent del package), cosi' `history/` resta alla radice. Golden invariati a ogni
+    sotto-passo (170577 / 30356). **Layout target raggiunto** (manca solo il resync doc, G2).
 - [ ] **G2** Aggiorna CLAUDE.md, wiki, DECISIONS.md con la nuova architettura. Aggiungi pagina wiki
   dedicata all'architettura a strati e al formato del contratto.
 
