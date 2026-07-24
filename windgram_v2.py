@@ -323,7 +323,15 @@ def build_chart(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
     nt = len(times)
     z2y, agl2y, top_agl, fr = W.make_vscale(elev, top_agl=top_agl)
     ztop = elev + top_agl
-    edges, lr = W.lapse_grid(times, levels, surf, elev)
+    # E3c (REFACTOR.md): profilo lapse (per lo sfondo) DAL contratto invece di
+    # ricalcolarlo con lapse_grid. Il contratto salva le colonne per-ora (None
+    # dove c'era NaN); si ricompongono le matrici (nz,nt)/(nz-1,nt) con i NaN
+    # nelle stesse posizioni, cosi' _lapse_at (che filtra ez con np.isfinite)
+    # si comporta in modo identico.
+    def _col(vals):
+        return [np.nan if x is None else x for x in vals]
+    edges = np.array([_col(forecast.hours[j].lapse.edges_m) for j in range(nt)]).T
+    lr = np.array([_col(forecast.hours[j].lapse.rate_c100m) for j in range(nt)]).T
 
     def X(j):
         return hour_x(px, pw, nt, j)
@@ -463,10 +471,17 @@ def build_chart(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
     if tgt[-1] != top_agl:
         tgt.append(top_agl)
     tgt = np.array(tgt)
+    # E3c: profilo vento DAL contratto (campioni alle quote native) invece di
+    # ricalcolarlo con wind_profile. wind_samples e' la parte pre-interpolazione
+    # di wind_profile (stessi campioni, stesso ordine): qui si ricampiona con lo
+    # stesso np.interp alle quote-target -> risultato identico. Liste vuote nel
+    # contratto == vecchio "u is None" (meno di 2 campioni validi).
     for j in range(nt):
-        u, v = W.wind_profile(levels, hwind, surf, elev, j, tgt)
-        if u is None:
+        wp = forecast.hours[j].wind
+        if len(wp.agl_m) < 2:
             continue
+        u = np.interp(tgt, wp.agl_m, wp.u_ms)
+        v = np.interp(tgt, wp.agl_m, wp.v_ms)
         for k, a in enumerate(tgt):
             spd = np.hypot(u[k], v[k]) * 3.6
             deg = (np.degrees(np.arctan2(-u[k], -v[k]))) % 360

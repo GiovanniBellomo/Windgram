@@ -5,15 +5,16 @@ netti, **per piccoli passi**, ognuno committabile e **verificabile a output inva
 Deciso con Giovanni il 2026-07-23. Vedi anche `DECISIONS.md` per le scelte di fondo.
 
 > ## ▶ STATO / RIPRENDERE DA QUI (2026-07-24)
-> Fatto: **A1, B1, C1, C2, C3, D1, E1, E2, E3a, E3b**. A1-E2 pushati su `origin/main` (commit
-> `98ead9c`); E3a/E3b committati in locale, **non ancora pushati**. Dati, fisica e contratto sono
-> separati e testati; `windgram_arome.py` e' una facciata di soli shim; niente piu'
+> Fatto: **A1, B1, C1, C2, C3, D1, E1, E2, E3a, E3b, E3c**. A1-E2 pushati su `origin/main` (commit
+> `98ead9c`); E3a/E3b/E3c committati in locale, **non ancora pushati**. Dati, fisica e contratto
+> sono separati e testati; `windgram_arome.py` e' una facciata di soli shim; niente piu'
 > matplotlib/scipy. Il contratto e' l'INGRESSO del rendering (`build_svg(forecast, ...)`); il
-> renderer legge gia' `climb_top_m` e `wstar_slope_15min` dal contratto (E3b), ma vento, lapse e
-> gli scalari per-ora sono ancora ricalcolati (E3c/E3d).
+> renderer legge dal contratto `climb_top_m`, `wstar_slope_15min` (E3b), il profilo vento e il
+> profilo lapse (E3c). Restano ricalcolati/sciolti solo gli scalari per-ora (zi, wstar, lcl,
+> superficie...) -> E3d.
 >
-> **Prossimo passo: E3c** (vedi checklist Fase E). E3 e' spezzato in 4 sotto-passi (E3a-E3d)
-> perche' e' il piu' delicato: far consumare il contratto al renderer, a golden invariato.
+> **Prossimo passo: E3d** (vedi checklist Fase E, l'ultimo di E3). E3 e' spezzato in 4 sotto-passi
+> (E3a-E3d) perche' e' il piu' delicato: far consumare il contratto al renderer, a golden invariato.
 >
 > **Come riprendere in sicurezza**: prima di ogni modifica e dopo, lanciare
 > `py tools/snapshot.py` — deve stampare `[SVG] OK` e `[contratto] OK` (entrambi identici ai
@@ -173,8 +174,14 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
       legge da `forecast.hours[j].wstar_slope_15min`. `therm_opacity` gia' tratta None come NaN.
       Il parametro `shf15` di `build_chart` e' ora inutilizzato (rimozione firma rimandata a E3d).
       Entrambi i golden invariati (170577 / 30356 char).
-  - [ ] **E3c** `build_chart` usa il profilo vento (`wind`) e il profilo lapse (`lapse`) dal
+  - [x] **E3c** `build_chart` usa il profilo vento (`wind`) e il profilo lapse (`lapse`) dal
     contratto, non piu' ricalcolati con `wind_profile`/`lapse_grid`. Golden invariato.
+    - Lapse: `edges`/`lr` (matrici nz×nt) ricomposte dalle colonne per-ora del contratto
+      (`forecast.hours[j].lapse`), None->NaN nelle stesse posizioni cosi' `_lapse_at` (filtra ez
+      con np.isfinite) e' identico. Vento: `forecast.hours[j].wind` da' i campioni nativi
+      (`wind_samples`, la parte pre-interpolazione di `wind_profile`); si ricampiona con lo stesso
+      `np.interp(tgt, ...)` -> barbe bit-identiche. `wind_profile`/`lapse_grid` non piu' chiamate
+      dal renderer. Entrambi i golden invariati (170577 / 30356 char).
   - [ ] **E3d** `build_chart`/`build_svg` leggono gli scalari per-ora (wstar, zi, lcl, superficie…)
     dal contratto invece che dagli array sciolti. Firma finale: `render(forecast)`. Golden
     invariato. Da qui il renderer non fa PIU' nessuna fisica.
