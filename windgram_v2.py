@@ -33,6 +33,23 @@ from windgram.core.forecast import build_forecast
 
 ROME_TZ = ZoneInfo("Europe/Rome")
 
+# Costanti di PRESENTAZIONE (etichette IT / nomi modello) usate dal renderer per
+# derivare le stringhe di intestazione dal contratto (E3d): erano locali a main().
+_MONTHS = ["", "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
+           "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"]
+_WD = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
+_MODEL_LABELS = {"icon_d2": "ICON-D2 · 2.2 km",
+                 "italia_meteo_arpae_icon_2i": "ICON-2I · 2 km",
+                 "icon_eu": "ICON-EU · 7 km"}
+
+
+def _narr(vals):
+    """Array float dai valori del contratto: None -> NaN (JSON-safe -> numpy).
+    Serve a ricostruire gli array sciolti (wstar, zi, superficie...) dagli
+    scalari per-ora del Forecast, cosi' il codice di rendering a valle resta
+    invariato (REFACTOR.md, E3d)."""
+    return np.array([np.nan if x is None else x for x in vals], dtype=float)
+
 
 # =========================================================================== #
 # COLORI / SCALE
@@ -312,26 +329,34 @@ def _lapse_at(ez, lv, z):
 # stati spostati in windgram/core/climb.py (REFACTOR.md, C2) e importati in cima.
 
 
-def build_chart(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
-                overdev, top_agl, geom, shf15=None):
-    # E3b (REFACTOR.md): `climb_top_m` e `wstar_slope_15min` si leggono ora DAL
-    # contratto (`forecast.hours[j]`) invece di ricalcolarli qui -- rimossa la
-    # duplicazione di climb_ceiling e della catena _w_at/_slope (con il dato
-    # shf15 a 15'), che vive gia' in windgram.core.forecast.build_forecast. Il
-    # parametro `shf15` non e' piu' usato qui (verra' tolto dalla firma in E3d).
+def build_chart(forecast, geom):
+    # E3d (REFACTOR.md): il grafico consuma SOLO il contratto -- nessuna fisica,
+    # nessun array sciolto in firma. Scalari per-ora (zi, wstar, lcl, overdev,
+    # superficie...) e tempo si ricostruiscono qui dal Forecast; il codice di
+    # disegno a valle resta invariato. climb_top/slope (E3b) e i profili
+    # vento/lapse (E3c) si leggono gia' dal contratto.
+    meta, hours = forecast.meta, forecast.hours
+    nt = len(hours)
+    elev, top_agl = meta.elev_m, meta.top_agl_m
+    times = [dt.datetime.fromisoformat(h.time) for h in hours]
+    zi = _narr([h.zi_m for h in hours])
+    wstar = _narr([h.wstar for h in hours])
+    lcl = _narr([h.lcl_m for h in hours])
+    overdev = np.array([h.overdev for h in hours])
+    fzl = _narr([h.freezing_level_m for h in hours])
+    cc_low = _narr([h.cloud_low_pct for h in hours])
+    cape = _narr([h.cape for h in hours])
     px, py, pw, ph = geom
-    nt = len(times)
     z2y, agl2y, top_agl, fr = W.make_vscale(elev, top_agl=top_agl)
     ztop = elev + top_agl
-    # E3c (REFACTOR.md): profilo lapse (per lo sfondo) DAL contratto invece di
-    # ricalcolarlo con lapse_grid. Il contratto salva le colonne per-ora (None
-    # dove c'era NaN); si ricompongono le matrici (nz,nt)/(nz-1,nt) con i NaN
-    # nelle stesse posizioni, cosi' _lapse_at (che filtra ez con np.isfinite)
-    # si comporta in modo identico.
+    # profilo lapse (per lo sfondo) DAL contratto (E3c): le colonne per-ora (None
+    # dove c'era NaN) si ricompongono nelle matrici (nz,nt)/(nz-1,nt) con i NaN
+    # nelle stesse posizioni, cosi' _lapse_at (che filtra ez con np.isfinite) e'
+    # identico.
     def _col(vals):
         return [np.nan if x is None else x for x in vals]
-    edges = np.array([_col(forecast.hours[j].lapse.edges_m) for j in range(nt)]).T
-    lr = np.array([_col(forecast.hours[j].lapse.rate_c100m) for j in range(nt)]).T
+    edges = np.array([_col(hours[j].lapse.edges_m) for j in range(nt)]).T
+    lr = np.array([_col(hours[j].lapse.rate_c100m) for j in range(nt)]).T
 
     def X(j):
         return hour_x(px, pw, nt, j)
@@ -391,7 +416,6 @@ def build_chart(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
     # resta in secondo piano, un riferimento di massima che non deve competere
     # con i dati operativi. Tratteggiata, sottile e semi-trasparente per lo
     # stesso motivo; i fiocchi di neve a ogni ora restano leggibili anche così.
-    fzl = surf.get("fzl")
     if fzl is not None:
         pts_fzl = [(X(j), Yz(fzl[j])) for j in range(nt) if not np.isnan(fzl[j])]
         if len(pts_fzl) >= 2:
@@ -488,9 +512,7 @@ def build_chart(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
             yb = Yagl(a)
             body.append(wind_barb(X(j), yb, spd, deg, L=14, col="#243b57"))
 
-    # --- nuvole: testa base, gambo, cima ---
-    cc_low = surf["cc_low"] if surf["cc_low"] is not None else surf["cc"]
-    cape = surf["cape"] if surf["cape"] is not None else np.zeros(nt)
+    # --- nuvole: testa base, gambo, cima --- (cc_low/cape dal contratto, in testa)
     CLOUD_GAP = 25.0  # m: la base disegnata resta questo tanto sopra la lcl, cosi'
                        # non viene mai tagliata dalla linea della termica (<= lcl)
     for j in range(nt):
@@ -567,8 +589,8 @@ def build_chart(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
     # il dato e' un accumulo orario (niente sotto-orario): la larghezza resta
     # quindi fissa al 50% della colonna oraria (= "e' piovuto per un'ora intera"),
     # solo la profondita' scala con l'intensita'.
-    precip = surf.get("precip")
-    if precip is not None and np.nanmax(np.nan_to_num(precip)) > 0.05:
+    precip = _narr([h.precip_mm for h in hours])  # dal contratto (tutti None -> all-NaN)
+    if np.nanmax(np.nan_to_num(precip)) > 0.05:
         pmax = max(float(np.nanmax(np.nan_to_num(precip))), 1.0)
         colw = (pw - 2 * HOUR_XPAD) / (nt - 1) if nt > 1 else pw
         bar_w = colw * 0.5
@@ -653,15 +675,35 @@ def ic_snowflake(cx, cy, r=5.0, col=ICE):
 
 
 # =========================================================================== #
-def build_svg(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
-              overdev, agg, name, model_label, run_label, top_agl,
-              date_str, period_str, run_time_str, gen_time_str,
-              lat, lon, shf15=None):
-    # E3a (REFACTOR.md): il contratto `forecast` (windgram.contract.Forecast) e'
-    # ora l'INGRESSO del rendering. In questo passo non e' ancora consumato --
-    # il renderer ricalcola ancora tutto dagli array sciolti -- ma il flusso
-    # fisica -> build_forecast -> render(forecast, ...) e' in piedi. E3b/E3c/E3d
-    # sposteranno progressivamente le letture dagli array al contratto.
+def build_svg(forecast):
+    # E3d (REFACTOR.md): il renderer consuma SOLO il contratto -- nessuna fisica,
+    # nessun array sciolto in firma. Gli array numpy (per il codice a valle, che
+    # resta invariato) e le stringhe di intestazione si ricostruiscono/derivano
+    # qui dal Forecast.
+    meta, hours = forecast.meta, forecast.hours
+    nt = len(hours)
+    elev, top_agl = meta.elev_m, meta.top_agl_m
+    lat, lon, name = meta.lat, meta.lon, meta.site
+    agg = forecast.aggregates
+    times = [dt.datetime.fromisoformat(h.time) for h in hours]
+    wstar = _narr([h.wstar for h in hours])
+
+    # --- stringhe di intestazione derivate dai metadati del contratto ---
+    model_label = _MODEL_LABELS.get(meta.model, meta.model)
+    date_str = (f"{_WD[times[0].weekday()].capitalize()} {times[0].day} "
+                f"{_MONTHS[times[0].month]} {times[0].year}")
+    period_str = f"{meta.period_start_h:02d}:00 - {meta.period_end_h:02d}:00 (ora locale)"
+    gen = dt.datetime.fromisoformat(meta.generated_utc)
+    gen_time_str = f"{gen.astimezone(ROME_TZ):%H:%M}"
+    if meta.run_utc:
+        run = dt.datetime.fromisoformat(meta.run_utc)
+        age = (gen - run).total_seconds() / 3600.0
+        run_label = f"corsa {run:%d %b %H:%M} UTC ({age:.0f} h fa)"
+        run_time_str = f"{run.astimezone(ROME_TZ):%H:%M}"
+    else:
+        run_label = None
+        run_time_str = "n/d"
+
     Wpx, Hpx = 1500, 1000
     defs = ['<filter id="sh" x="-20%" y="-20%" width="140%" height="140%">'
             '<feDropShadow dx="0" dy="1.5" stdDeviation="3" flood-color="#1b2a4a" '
@@ -768,8 +810,7 @@ def build_svg(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
                 f'gradientUnits="userSpaceOnUse">{gstops}</linearGradient>')
     S.append(rrect(px, bar_y, pw, bar_h, 4, "url(#wbar)", "#c9d0da", 0.8))
 
-    cdefs, cbody = build_chart(forecast, times, levels, hwind, surf, elev, zi, wstar,
-                               lcl, overdev, top_agl, geom, shf15)
+    cdefs, cbody = build_chart(forecast, geom)
     defs.append(cdefs)
     S.append(cbody)
 
@@ -837,7 +878,11 @@ def build_svg(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
     def TX(j):                                      # STESSE ascisse delle ore
         return hour_x(tgx, tgw, nt, j)
 
-    ws10 = surf["ws10"]; g10 = surf["gust10"]; T2 = surf["T2m"]; wd = surf["wd10"]
+    # superficie per-ora dal contratto (m/s e gradi come negli array originali)
+    ws10 = _narr([h.surface.wind_ms for h in hours])
+    g10 = _narr([h.surface.gust_ms for h in hours])
+    T2 = _narr([h.surface.t2m_c for h in hours])
+    wd = _narr([h.surface.dir_deg for h in hours])
     rows = [("wind", ic_wind_s, "VENTO SUOLO", "med/raff (km/h)"),
             ("dir", ic_wind_s, "DIR. VENTO SUOLO", None),
             ("temp", ic_thermo, "T SUOLO (\u00b0C)", None)]
@@ -920,29 +965,11 @@ def main():
         print("Flusso 15' non disponibile, uso interpolazione oraria.", file=sys.stderr)
 
     init = W.fetch_model_run(args.model)
-    if init is not None:
-        age = (dt.datetime.now(dt.timezone.utc) - init).total_seconds() / 3600
-        run_label = f"corsa {init:%d %b %H:%M} UTC ({age:.0f} h fa)"
-        run_time_str = f"{init.astimezone(ROME_TZ):%H:%M}"
-    else:
-        run_label = None
-        run_time_str = "n/d"
-    gen_time_str = f"{dt.datetime.now(ROME_TZ):%H:%M}"
 
-    labels_map = {"icon_d2": "ICON-D2 · 2.2 km",
-                  "italia_meteo_arpae_icon_2i": "ICON-2I · 2 km",
-                  "icon_eu": "ICON-EU · 7 km"}
-    model_label = labels_map.get(args.model, args.model)
-    months = ["", "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
-              "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"]
-    wd = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
-    d0 = times[0]
-    date_str = f"{wd[d0.weekday()].capitalize()} {d0.day} {months[d0.month]} {d0.year}"
-    period_str = f"{args.start:02d}:00 - {args.end:02d}:00 (ora locale)"
-
-    # E3a (REFACTOR.md): assembla il contratto e passalo come INGRESSO del
-    # rendering (fisica -> build_forecast -> render). Il renderer non lo consuma
-    # ancora (ricalcola internamente), ma da qui il flusso e' quello finale.
+    # E3d (REFACTOR.md): assembla il contratto e passalo come UNICO argomento del
+    # rendering (fisica -> build_forecast -> render(forecast)). Il renderer non fa
+    # piu' nessuna fisica: legge scalari, profili e metadati (comprese le stringhe
+    # di intestazione) dal contratto.
     forecast = build_forecast(
         times, levels, hwind, surf, elev, zi, wstar, lcl, work_top, overdev, agg,
         site=args.name, lat=args.lat, lon=args.lon, model=args.model,
@@ -951,10 +978,7 @@ def main():
         timezone="Europe/Rome", top_agl=args.top_agl,
         period_start_h=args.start, period_end_h=args.end, shf15=shf15)
 
-    svg = build_svg(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
-                    overdev, agg, args.name, model_label, run_label, args.top_agl,
-                    date_str, period_str, run_time_str, gen_time_str,
-                    args.lat, args.lon, shf15)
+    svg = build_svg(forecast)
     page = (f'<!doctype html><html lang="it"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<title>{esc(args.name)} - windgram</title>'

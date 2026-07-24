@@ -39,18 +39,13 @@ START, END = 8, 20
 NAME = "Piancavallo - Antenne Castaldia"
 TOP_AGL = 5000.0
 TIMEZONE = "Europe/Rome"
-# valori CONGELATI: in produzione dipendono dall'ora corrente e dalla corsa
-RUN_LABEL = "corsa 23 Jul 12:00 UTC (5 h fa)"
-RUN_TIME_STR = "14:00"
-GEN_TIME_STR = "19:00"
+# valori CONGELATI della corsa/generazione: in produzione dipendono dall'ora
+# corrente. Da E3d le stringhe di intestazione le DERIVA il renderer da questi
+# metadati del contratto, quindi RUN_UTC/GEN_UTC devono essere auto-coerenti con
+# gli orari mostrati (Europe/Rome, +2 d'estate): 12:00 UTC -> 14:00, 17:00 UTC
+# -> 19:00. (GEN_UTC era 17:09, incoerente col "19:00" mostrato: corretto a 17:00.)
 RUN_UTC = "2026-07-23T12:00:00+00:00"
-GEN_UTC = "2026-07-23T17:09:00+00:00"
-
-MONTHS = ["", "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
-          "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"]
-WD = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
-LABELS = {"icon_d2": "ICON-D2 · 2.2 km",
-          "italia_meteo_arpae_icon_2i": "ICON-2I · 2 km", "icon_eu": "ICON-EU · 7 km"}
+GEN_UTC = "2026-07-23T17:00:00+00:00"
 
 
 def _load_inputs():
@@ -89,18 +84,10 @@ def _forecast_from_inputs(x):
 
 
 def build_svg_from_fixture():
-    x = _load_inputs()
-    d0 = x["times"][0]
-    date_str = f"{WD[d0.weekday()].capitalize()} {d0.day} {MONTHS[d0.month]} {d0.year}"
-    period_str = f"{START:02d}:00 - {END:02d}:00 (ora locale)"
-    model_label = LABELS.get(x["model"], x["model"])
-    forecast = _forecast_from_inputs(x)  # E3a: contratto = ingresso del rendering
-    return V.build_svg(forecast,
-                       x["times"], x["levels"], x["hwind"], x["surf"], x["elev"],
-                       x["zi"], x["wstar"], x["lcl"], x["overdev"], x["agg"],
-                       NAME, model_label, RUN_LABEL, TOP_AGL,
-                       date_str, period_str, RUN_TIME_STR, GEN_TIME_STR,
-                       x["lat"], x["lon"], x["shf15"])
+    # E3d: il renderer consuma SOLO il contratto -> render(forecast). Le stringhe
+    # di intestazione (data IT, orari corsa/generazione) le deriva build_svg dai
+    # metadati del contratto, non le passa piu' il chiamante.
+    return V.build_svg(_forecast_from_inputs(_load_inputs()))
 
 
 def build_forecast_json_from_fixture():

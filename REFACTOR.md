@@ -5,16 +5,17 @@ netti, **per piccoli passi**, ognuno committabile e **verificabile a output inva
 Deciso con Giovanni il 2026-07-23. Vedi anche `DECISIONS.md` per le scelte di fondo.
 
 > ## ▶ STATO / RIPRENDERE DA QUI (2026-07-24)
-> Fatto: **A1, B1, C1, C2, C3, D1, E1, E2, E3a, E3b, E3c**. A1-E2 pushati su `origin/main` (commit
-> `98ead9c`); E3a/E3b/E3c committati in locale, **non ancora pushati**. Dati, fisica e contratto
-> sono separati e testati; `windgram_arome.py` e' una facciata di soli shim; niente piu'
-> matplotlib/scipy. Il contratto e' l'INGRESSO del rendering (`build_svg(forecast, ...)`); il
-> renderer legge dal contratto `climb_top_m`, `wstar_slope_15min` (E3b), il profilo vento e il
-> profilo lapse (E3c). Restano ricalcolati/sciolti solo gli scalari per-ora (zi, wstar, lcl,
-> superficie...) -> E3d.
+> Fatto: **A1, B1, C1, C2, C3, D1, E1, E2, E3 (a/b/c/d)** — **Fase E COMPLETA**. A1-E2 pushati su
+> `origin/main` (commit `98ead9c`); E3a-E3d committati in locale, **non ancora pushati**. Dati,
+> fisica e contratto sono separati e testati; `windgram_arome.py` e' una facciata di soli shim;
+> niente piu' matplotlib/scipy. **Il renderer consuma SOLO il contratto**: `build_svg(forecast)` /
+> `build_chart(forecast, geom)`, nessuna fisica e nessun array sciolto in firma; anche le stringhe
+> di intestazione (data IT, orari corsa/generazione, etichetta modello) le DERIVA il renderer dai
+> metadati del contratto.
 >
-> **Prossimo passo: E3d** (vedi checklist Fase E, l'ultimo di E3). E3 e' spezzato in 4 sotto-passi
-> (E3a-E3d) perche' e' il piu' delicato: far consumare il contratto al renderer, a golden invariato.
+> **Prossimo passo: F1** (Fase F — nuove superfici). E3/E fatte. Nota: E3d ha aggiornato il golden
+> `tests/golden/forecast.json` in UN campo (`generated_utc` 17:09 -> 17:00) per rendere l'harness
+> auto-coerente con l'orario mostrato -- l'SVG golden e' rimasto byte-identico (170577 char).
 >
 > **Come riprendere in sicurezza**: prima di ogni modifica e dopo, lanciare
 > `py tools/snapshot.py` — deve stampare `[SVG] OK` e `[contratto] OK` (entrambi identici ai
@@ -182,9 +183,19 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
       (`wind_samples`, la parte pre-interpolazione di `wind_profile`); si ricampiona con lo stesso
       `np.interp(tgt, ...)` -> barbe bit-identiche. `wind_profile`/`lapse_grid` non piu' chiamate
       dal renderer. Entrambi i golden invariati (170577 / 30356 char).
-  - [ ] **E3d** `build_chart`/`build_svg` leggono gli scalari per-ora (wstar, zi, lcl, superficie…)
-    dal contratto invece che dagli array sciolti. Firma finale: `render(forecast)`. Golden
-    invariato. Da qui il renderer non fa PIU' nessuna fisica.
+  - [x] **E3d** `build_chart`/`build_svg` leggono gli scalari per-ora (wstar, zi, lcl, superficie…)
+    dal contratto invece che dagli array sciolti. Firma finale: `render(forecast)`. Da qui il
+    renderer non fa PIU' nessuna fisica.
+    - Firme: `build_svg(forecast)` e `build_chart(forecast, geom)`. Tecnica a basso rischio: in
+      testa a ciascuna si RICOSTRUISCONO gli array numpy sciolti dal contratto (helper `_narr`,
+      None->NaN) cosi' tutto il codice di disegno a valle resta invariato. Le stringhe di
+      intestazione (data IT, `period_str`, `model_label`, `run_label`, `run_time_str`,
+      `gen_time_str`) le deriva `build_svg` da `meta` (costanti `_MONTHS/_WD/_MODEL_LABELS` portate
+      a livello modulo; `run_label`/orari da `run_utc`/`generated_utc`+`ROME_TZ`). `main()` ora fa
+      solo `build_svg(forecast)`. SVG golden byte-identico (170577); golden `forecast.json`
+      aggiornato in un campo (`generated_utc` 17:09->17:00) per auto-coerenza dell'harness col
+      "19:00" mostrato (Roma=UTC+2). `climb_ceiling`/`SINK_RATE` restano importati (noqa) in
+      `windgram_v2.py`: pulizia import rimandata a G1.
 
 ### Fase F — Nuove superfici abilitate dal contratto
 - [ ] **F1** `windgram/render/json_api.py`: serializza il contratto (è di fatto il payload API).
