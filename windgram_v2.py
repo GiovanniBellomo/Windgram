@@ -17,6 +17,7 @@ Richiede windgram_arome.py nella stessa cartella.
 """
 
 import argparse
+import os
 import sys
 import html
 import datetime as dt
@@ -30,8 +31,13 @@ import windgram_arome as W
 from windgram.core.climb import climb_ceiling, SINK_RATE  # noqa: F401
 from windgram.core.aggregate import aggregate, _card16  # noqa: F401
 from windgram.core.forecast import build_forecast
+from windgram.render.json_api import render_json
 
 ROME_TZ = ZoneInfo("Europe/Rome")
+
+# cartella di default del log storico (accanto a questo script, cosi' e' stabile
+# a prescindere dalla cwd di lancio). Ignorata da git: e' dato rigenerabile.
+_DEFAULT_HISTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "history")
 
 # Costanti di PRESENTAZIONE (etichette IT / nomi modello) usate dal renderer per
 # derivare le stringhe di intestazione dal contratto (E3d): erano locali a main().
@@ -929,6 +935,26 @@ def _gust_col(gk):
 
 
 # =========================================================================== #
+def write_history(forecast, history_dir):
+    """Log storico a costo ~zero (REFACTOR.md, F2): scrive il contratto JSON su
+    file, uno per (giorno previsto, modello, corsa). Ri-eseguire la STESSA corsa
+    sovrascrive lo stesso file (idempotente, niente duplicati); una corsa nuova
+    o un altro giorno crea un file nuovo. Abilita la futura correzione statistica
+    (confronto previsione vs osservazioni reali). Passa per `render_json`, la
+    superficie payload (F1). Ritorna il percorso scritto."""
+    meta = forecast.meta
+    day = forecast.hours[0].time[:10] if forecast.hours else "na"   # AAAA-MM-GG previsto
+    if meta.run_utc:
+        run_tag = f"run{dt.datetime.fromisoformat(meta.run_utc):%Y%m%dT%H%MZ}"
+    else:
+        run_tag = "runNA"
+    os.makedirs(history_dir, exist_ok=True)
+    path = os.path.join(history_dir, f"{day}_{meta.model}_{run_tag}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(render_json(forecast, indent=1))
+    return path
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--lat", type=float, default=46.087557)
@@ -940,6 +966,10 @@ def main():
     ap.add_argument("--top-agl", type=float, default=5000)
     ap.add_argument("--model", default="icon_d2")
     ap.add_argument("--out", default="windgram.html")
+    ap.add_argument("--history-dir", default=_DEFAULT_HISTORY,
+                    help="cartella del log storico dei contratti (default: ./history)")
+    ap.add_argument("--no-history", action="store_true",
+                    help="non scrivere il log storico del contratto")
     args = ap.parse_args()
 
     try:
@@ -977,6 +1007,15 @@ def main():
         generated_utc=dt.datetime.now(dt.timezone.utc).isoformat(),
         timezone="Europe/Rome", top_agl=args.top_agl,
         period_start_h=args.start, period_end_h=args.end, shf15=shf15)
+
+    # F2 (REFACTOR.md): log storico del contratto a costo ~zero. Non deve mai far
+    # fallire la generazione del windgram: se scrivere fallisce (permessi, disco)
+    # si avvisa e si prosegue.
+    if not args.no_history:
+        try:
+            print(f"Log storico: {write_history(forecast, args.history_dir)}")
+        except OSError as e:
+            print(f"Log storico non scritto: {e}", file=sys.stderr)
 
     svg = build_svg(forecast)
     page = (f'<!doctype html><html lang="it"><head><meta charset="utf-8">'

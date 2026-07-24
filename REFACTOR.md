@@ -13,10 +13,11 @@ Deciso con Giovanni il 2026-07-23. Vedi anche `DECISIONS.md` per le scelte di fo
 > di intestazione (data IT, orari corsa/generazione, etichetta modello) le DERIVA il renderer dai
 > metadati del contratto.
 >
-> **Prossimo passo: F2** (log storico a costo zero). Fatti anche E3 (E completa) e **F1** (renderer
-> JSON `windgram/render/json_api.py`). Nota: E3d aveva aggiornato il golden `forecast.json` in UN
-> campo (`generated_utc` 17:09 -> 17:00) per auto-coerenza dell'harness -- l'SVG golden e' rimasto
-> byte-identico (170577 char).
+> **Prossimo passo: G1** (struttura finale `windgram/` + rimozione shim). **Fase F COMPLETA**
+> (F1 renderer JSON, F2 log storico a costo zero). Nota tecnica da G1: togliere l'import morto
+> `climb_ceiling`/`SINK_RATE` da `windgram_v2.py` (ora solo nei commenti). E3d aveva aggiornato il
+> golden `forecast.json` in UN campo (`generated_utc` 17:09 -> 17:00) per auto-coerenza dell'harness
+> -- l'SVG golden e' rimasto byte-identico (170577 char).
 >
 > **Come riprendere in sicurezza**: prima di ogni modifica e dopo, lanciare
 > `py tools/snapshot.py` — deve stampare `[SVG] OK` e `[contratto] OK` (entrambi identici ai
@@ -205,8 +206,14 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
     `Forecast.to_json` (domani il payload puo' cambiare senza toccare il contratto). `indent=None`
     = compatto (HTTP), `indent=N` = leggibile (log). `tools/snapshot.py` ora produce il golden JSON
     via `render_json(..., indent=1)` (esercita la superficie reale). Golden invariati (170577 / 30356).
-- [ ] **F2** Log a costo zero: `cli.py` scrive il contratto JSON in `history/AAAA-MM-GG_run.json`
-  a ogni esecuzione. Abilita la futura analisi errore.
+- [x] **F2** Log a costo zero: a ogni esecuzione si scrive il contratto JSON in
+  `history/AAAA-MM-GG_<modello>_run<AAAAMMGGgTHHMMZ>.json`. Abilita la futura analisi errore.
+  - `write_history(forecast, dir)` in `windgram_v2.py` (l'orchestratore attuale; migrera' in
+    `cli.py` in G1), passa per `render_json(indent=1)`. Un file per (giorno previsto, modello,
+    corsa): ri-eseguire la stessa corsa sovrascrive (idempotente). Non fa mai fallire la
+    generazione (try/except OSError -> warning). CLI: `--history-dir` (default `./history` accanto
+    allo script) e `--no-history`. `history/` aggiunto a `.gitignore` (dato rigenerabile). Golden
+    invariati (main non e' nel path dello snapshot).
 
 ### Fase G — Struttura finale e pulizia
 - [ ] **G1** Sposta i file nel layout `windgram/` definitivo, aggiorna gli import, rimuovi gli shim

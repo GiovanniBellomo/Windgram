@@ -2,6 +2,9 @@
 *.html
 *.png
 
+# log storico dei contratti (F2): dato prodotto a runtime, non da versionare
+history/
+
 # cache Python
 __pycache__/
 *.pyc
