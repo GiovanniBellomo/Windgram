@@ -4,6 +4,20 @@ Contesto per Claude Code. Leggere tutto prima di modificare il codice.
 L'utente (Giovanni) comunica in **italiano**, ambiente **Windows 11 + PowerShell**,
 lancia Python con `py` (non `python`). Preferisce deliverable precisi e strutturati.
 
+## Comandi rapidi (Windows, PowerShell, `py` non `python`)
+
+| Scopo | Comando |
+|-------|---------|
+| Genera dashboard | `py windgram_v2.py --lat 46.087557 --lon 12.530206 --name "Piancavallo - Antenne Castaldia" --start 9 --end 19 --out windgram.html` |
+| **Rete di sicurezza** (dopo OGNI modifica) | `py tools/snapshot.py` → deve stampare `[SVG] OK` e `[contratto] OK` |
+| Aggiorna i golden (solo se il cambio è voluto) | `py tools/snapshot.py --update` |
+| Test del contratto (round-trip, no pytest) | `py tests/test_contract.py` |
+| Ricattura la fixture Open-Meteo (una-tantum, richiede rete) | `py tools/capture_fixture.py` |
+
+Dipendenze runtime: `py -m pip install requests numpy` (matplotlib/scipy ritirati con la v1 PNG).
+Pipeline: `sources/openmeteo` → `core/{thermals,climb,aggregate,forecast}` → `contract` → renderer `windgram_v2`.
+Refactoring a strati in corso: leggere `REFACTOR.md` (punto di ripresa **E3a**) prima di toccare il codice.
+
 ## Regole di lavoro permanenti (volute esplicitamente da Giovanni, 2026-07-23 — non derogabili)
 
 1. **Commit dopo ogni modifica al codice**, uno per cambio logico — non accumulare. Il push verso
