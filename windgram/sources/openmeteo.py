@@ -7,9 +7,9 @@ Acquisizione dei dati grezzi da Open-Meteo (modello ICON-D2 di default) e loro
 parsing in strutture pronte per la fisica (`to_grid`). NESSUN calcolo fisico,
 NESSUNA rappresentazione: solo I/O + parsing.
 
-Estratto verbatim da windgram_arome.py nel refactoring a strati (REFACTOR.md,
-Step B1). Le funzioni restano invocabili anche via `windgram_arome` (shim di
-ri-esportazione) per non rompere il codice esistente.
+Estratto dal vecchio monolite windgram_arome.py nel refactoring a strati
+(REFACTOR.md, Step B1). Lo shim `windgram_arome` e' stato rimosso in Fase G1:
+i consumatori importano direttamente da qui.
 """
 import datetime as dt
 

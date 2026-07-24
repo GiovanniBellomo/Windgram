@@ -3,17 +3,13 @@
 """
 windgram_v2.py  --  cruscotto (dashboard) HTML+SVG del windgram.
 
-Riusa TUTTA la fisica gia' validata importando windgram_arome.py (fetch, thermals
-con W* Deardorff, orario corsa, scala verticale a bande). Aggiunge le aggregazioni
-(stelle, finestra migliore, range) e genera un unico file .html con dentro un
-grande <svg> con l'intera dashboard: header, colonna sintesi, grafico, legende,
-tabella oraria, footer.
+Usa la fisica del package `windgram/` (Strato 0 dati + Strato 1 fisica), assembla
+il contratto e genera un unico file .html con dentro un grande <svg> con l'intera
+dashboard: header, colonna sintesi, grafico, legende, tabella oraria, footer.
 
 Uso:
   python3 windgram_v2.py --lat 46.087557 --lon 12.530206 \
       --name "Piancavallo - Antenne Castaldia" --start 9 --end 19 --out windgram.html
-
-Richiede windgram_arome.py nella stessa cartella.
 """
 
 import argparse
@@ -24,11 +20,12 @@ import datetime as dt
 from zoneinfo import ZoneInfo
 
 import numpy as np
-import windgram_arome as W
-# Strato 1 (fisica): quota raggiungibile e aggregazioni di sintesi estratte nei
-# moduli core (REFACTOR.md, C2/C3) -- erano fisica/logica incastonata qui.
-# `_card16` (gradi->cardinale) e' condiviso: lo usa anche il rendering (tabella).
-from windgram.core.climb import climb_ceiling, SINK_RATE  # noqa: F401
+# Strato 0 (dati) e Strato 1 (fisica): import diretti dal package windgram/
+# (lo shim windgram_arome e' stato rimosso in Fase G1). `_card16` (gradi->
+# cardinale) e' condiviso: lo usa anche il rendering (tabella).
+from windgram.sources.openmeteo import (fetch, to_grid, fetch_elevation,
+                                        fetch_shf15, fetch_model_run)
+from windgram.core.thermals import thermals, make_vscale
 from windgram.core.aggregate import aggregate, _card16  # noqa: F401
 from windgram.core.forecast import build_forecast
 from windgram.render.json_api import render_json
@@ -353,7 +350,7 @@ def build_chart(forecast, geom):
     cc_low = _narr([h.cloud_low_pct for h in hours])
     cape = _narr([h.cape for h in hours])
     px, py, pw, ph = geom
-    z2y, agl2y, top_agl, fr = W.make_vscale(elev, top_agl=top_agl)
+    z2y, agl2y, top_agl, fr = make_vscale(elev, top_agl=top_agl)
     ztop = elev + top_agl
     # profilo lapse (per lo sfondo) DAL contratto (E3c): le colonne per-ora (None
     # dove c'era NaN) si ricompongono nelle matrici (nz,nt)/(nz-1,nt) con i NaN
@@ -973,28 +970,28 @@ def main():
     args = ap.parse_args()
 
     try:
-        data = W.fetch(args.lat, args.lon, args.model)
+        data = fetch(args.lat, args.lon, args.model)
     except Exception as e:
         print(f"Errore fetch API: {e}", file=sys.stderr); sys.exit(1)
-    times, levels, hwind, surf, grid_elev = W.to_grid(data, args.start, args.end)
-    elev = args.elev if args.elev is not None else W.fetch_elevation(args.lat, args.lon)
+    times, levels, hwind, surf, grid_elev = to_grid(data, args.start, args.end)
+    elev = args.elev if args.elev is not None else fetch_elevation(args.lat, args.lon)
     if elev is None:
         elev = grid_elev if grid_elev is not None else 1098.0
     print(f"Quota decollo: {elev:.0f} m slm")
     if len(levels) < 3:
         print("Pochi livelli validi.", file=sys.stderr); sys.exit(2)
 
-    zi, wstar, lcl, work_top, overdev = W.thermals(times, levels, surf, elev)
+    zi, wstar, lcl, work_top, overdev = thermals(times, levels, surf, elev)
     agg = aggregate(times, surf, zi, wstar, lcl, work_top, overdev, elev)
 
     # flusso di calore sensibile a 15' (per rifinire la stabilita' della
     # "quota raggiungibile"); se non disponibile si ripiega silenziosamente
     # sulla sola interpolazione del W* orario (vedi build_chart)
-    shf15 = W.fetch_shf15(args.lat, args.lon, args.model)
+    shf15 = fetch_shf15(args.lat, args.lon, args.model)
     if shf15[0] is None:
         print("Flusso 15' non disponibile, uso interpolazione oraria.", file=sys.stderr)
 
-    init = W.fetch_model_run(args.model)
+    init = fetch_model_run(args.model)
 
     # E3d (REFACTOR.md): assembla il contratto e passalo come UNICO argomento del
     # rendering (fisica -> build_forecast -> render(forecast)). Il renderer non fa

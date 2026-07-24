@@ -8,9 +8,9 @@ gradiente di strato (lapse), base cumuli (lcl), cima BL + W* Deardorff
 (thermals), profilo di vento in quota (wind_profile), scala verticale a bande
 (make_vscale). Funzioni PURE: nessun I/O di rete, nessuna rappresentazione.
 
-Estratto verbatim da windgram_arome.py nel refactoring a strati (REFACTOR.md,
-Step C1). Restano invocabili anche via `windgram_arome` (shim di
-ri-esportazione) per non rompere il codice esistente.
+Estratto dal vecchio monolite windgram_arome.py nel refactoring a strati
+(REFACTOR.md, Step C1). Lo shim `windgram_arome` e' stato rimosso in Fase G1:
+i consumatori importano direttamente da qui.
 """
 import numpy as np
 

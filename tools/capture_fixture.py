@@ -20,9 +20,10 @@ import json
 import os
 import sys
 
-# rende importabile windgram_arome dalla radice del progetto
+# rende importabile il package windgram/ dalla radice del progetto
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import windgram_arome as W  # noqa: E402
+from windgram.sources.openmeteo import (fetch, fetch_elevation,  # noqa: E402
+                                        fetch_shf15)
 
 LAT, LON, MODEL = 46.087557, 12.530206, "icon_d2"
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -31,11 +32,11 @@ OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 
 def main():
     print("Fetch forecast...")
-    data = W.fetch(LAT, LON, MODEL)
+    data = fetch(LAT, LON, MODEL)
     print("Fetch elevation...")
-    elev = W.fetch_elevation(LAT, LON)
+    elev = fetch_elevation(LAT, LON)
     print("Fetch flusso 15'...")
-    sh_t, sh_v = W.fetch_shf15(LAT, LON, MODEL)
+    sh_t, sh_v = fetch_shf15(LAT, LON, MODEL)
 
     fixture = {
         "lat": LAT, "lon": LON, "model": MODEL,

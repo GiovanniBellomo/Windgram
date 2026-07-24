@@ -25,8 +25,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np  # noqa: E402
-import windgram_arome as W  # noqa: E402
 import windgram_v2 as V  # noqa: E402
+from windgram.sources.openmeteo import to_grid  # noqa: E402
+from windgram.core.thermals import thermals  # noqa: E402
+from windgram.core.aggregate import aggregate  # noqa: E402
 from windgram.core.forecast import build_forecast  # noqa: E402
 from windgram.render.json_api import render_json  # noqa: E402
 
@@ -62,11 +64,11 @@ def _load_inputs():
     else:
         shf15 = None
 
-    times, levels, hwind, surf, grid_elev = W.to_grid(data, START, END)
+    times, levels, hwind, surf, grid_elev = to_grid(data, START, END)
     if elev is None:
         elev = grid_elev
-    zi, wstar, lcl, work_top, overdev = W.thermals(times, levels, surf, elev)
-    agg = V.aggregate(times, surf, zi, wstar, lcl, work_top, overdev, elev)
+    zi, wstar, lcl, work_top, overdev = thermals(times, levels, surf, elev)
+    agg = aggregate(times, surf, zi, wstar, lcl, work_top, overdev, elev)
     return dict(fx=fx, data=data, elev=elev, model=model, shf15=shf15,
                 times=times, levels=levels, hwind=hwind, surf=surf,
                 zi=zi, wstar=wstar, lcl=lcl, work_top=work_top, overdev=overdev,
