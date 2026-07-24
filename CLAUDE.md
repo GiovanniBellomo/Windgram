@@ -16,7 +16,7 @@ lancia Python con `py` (non `python`). Preferisce deliverable precisi e struttur
 
 Dipendenze runtime: `py -m pip install requests numpy` (matplotlib/scipy ritirati con la v1 PNG).
 Pipeline: `sources/openmeteo` → `core/{thermals,climb,aggregate,forecast}` → `contract` → renderer `windgram_v2`.
-Refactoring a strati in corso: leggere `REFACTOR.md` (punto di ripresa **E3a**) prima di toccare il codice.
+Refactoring a strati in corso: leggere `REFACTOR.md` (punto di ripresa **F1**) prima di toccare il codice.
 
 ## Regole di lavoro permanenti (volute esplicitamente da Giovanni, 2026-07-23 — non derogabili)
 
@@ -47,12 +47,16 @@ Dal 2026-07-23 il progetto sta migrando da 2 file monolitici a un'architettura a
 (`windgram/sources` → `windgram/core` → `windgram/contract` → renderer). **Piano completo e punto
 di ripresa in [`REFACTOR.md`](REFACTOR.md)** — leggerlo prima di modificare.
 
-Stato: fatti A1–E2. **Prossimo passo: E3a.** In sintesi già oggi:
+Stato: fatti A1–E3 (**Fase E completa**). **Prossimo passo: F1.** In sintesi già oggi:
 - `windgram_arome.py` NON è più il monolite: è una **facciata di ~27 righe** (soli shim) che
   ri-esporta da `windgram/sources/openmeteo.py` (dati) e `windgram/core/thermals.py` (fisica). Il
   **rendering PNG v1 (matplotlib/scipy) è stato RITIRATO**.
 - La fisica vive in `windgram/core/` (`thermals.py`, `climb.py`, `aggregate.py`, `forecast.py`); il
   **contratto** in `windgram/contract.py`. `windgram_v2.py` è ora presentazione + orchestrazione.
+- **Il renderer consuma SOLO il contratto** (E3d): `build_svg(forecast)` /
+  `build_chart(forecast, geom)` — nessuna fisica, nessun array sciolto; anche le stringhe di
+  intestazione le deriva dai metadati del contratto. Restano da fare F (nuove superfici: json_api,
+  log storico) e G (layout `windgram/` definitivo, rimozione shim, resync CLAUDE.md/wiki).
 - **Rete di sicurezza obbligatoria**: dopo ogni modifica lanciare `py tools/snapshot.py` — deve
   stampare `[SVG] OK` e `[contratto] OK` (identici ai golden in `tests/golden/`).
 
@@ -109,7 +113,7 @@ PNG è stata ritirata, `matplotlib`/`scipy` **non servono più**.
 | `tests/` | `fixtures/` (risposta Open-Meteo salvata), `golden/` (dashboard.svg + forecast.json), `test_contract.py`. | Attivi |
 
 **Rete di sicurezza**: dopo ogni modifica lanciare `py tools/snapshot.py` → deve stampare
-`[SVG] OK` e `[contratto] OK`. Vedi `REFACTOR.md` per il piano e il punto di ripresa (E3a).
+`[SVG] OK` e `[contratto] OK`. Vedi `REFACTOR.md` per il piano e il punto di ripresa (F1).
 
 Nota storica: `windgram_arome.py` è stato a lungo un monolite di ~695 righe (dati+fisica+PNG). Non
 dare per scontato lo stato di un file: **verificare con `wc -l` / `grep "^def"` prima di assumere.**
