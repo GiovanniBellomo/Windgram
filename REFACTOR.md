@@ -4,20 +4,16 @@ Documento di lavoro. Definisce la migrazione da 2 file monolitici a un'architett
 netti, **per piccoli passi**, ognuno committabile e **verificabile a output invariato**.
 Deciso con Giovanni il 2026-07-23. Vedi anche `DECISIONS.md` per le scelte di fondo.
 
-> ## ▶ STATO / RIPRENDERE DA QUI (2026-07-24)
-> Fatto: **A1, B1, C1, C2, C3, D1, E1, E2, E3 (a/b/c/d)** — **Fase E COMPLETA**. A1-E2 pushati su
-> `origin/main` (commit `98ead9c`); E3a-E3d committati in locale, **non ancora pushati**. Dati,
-> fisica e contratto sono separati e testati; `windgram_arome.py` e' una facciata di soli shim;
-> niente piu' matplotlib/scipy. **Il renderer consuma SOLO il contratto**: `build_svg(forecast)` /
-> `build_chart(forecast, geom)`, nessuna fisica e nessun array sciolto in firma; anche le stringhe
-> di intestazione (data IT, orari corsa/generazione, etichetta modello) le DERIVA il renderer dai
-> metadati del contratto.
+> ## ▶ STATO (2026-07-24) — ✅ REFACTORING CONCLUSO (Fasi A–G)
+> Tutte le fasi completate. Layout finale: `windgram/{sources,core,contract,render/{svg,json_api},
+> cli}` + lanciatore sottile `windgram_v2.py`. Shim `windgram_arome.py` rimosso; niente
+> matplotlib/scipy. **Il renderer consuma SOLO il contratto** (`build_svg(forecast)`); superfici
+> nuove: payload JSON (`render_json`) e log storico a costo zero (`write_history`). Ogni passo a
+> golden invariato (rete di sicurezza `tools/snapshot.py`: `[SVG] OK` + `[contratto] OK`).
 >
-> **Prossimo passo: G2** (resync doc: CLAUDE.md, wiki, DECISIONS.md + pagina wiki su architettura a
-> strati e formato del contratto). **G1 COMPLETA** (a/b/c): shim rimosso, rendering in
-> `windgram/render/svg.py`, orchestrazione in `windgram/cli.py`, `windgram_v2.py` = lanciatore
-> sottile. **Layout target raggiunto.** L'unica cosa che resta e' allineare la documentazione al
-> codice (§3 di CLAUDE.md descrive ancora la struttura pre-G1).
+> Doc allineate: `CLAUDE.md` (§3 tabella file, §17 contratto/API, banner architettura), `DECISIONS.md`,
+> e il **wiki** (repo separato — pagina "Contratto e API" nuova, "Architettura e File" riscritta).
+> Non c'e' un "prossimo passo" del refactoring: da qui si torna al lavoro di prodotto (tarature §13).
 >
 > **Come riprendere in sicurezza**: prima di ogni modifica e dopo, lanciare
 > `py tools/snapshot.py` — deve stampare `[SVG] OK` e `[contratto] OK` (entrambi identici ai
@@ -229,11 +225,13 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
     `py windgram_v2.py ...` sia `py -m windgram.cli ...`. `_DEFAULT_HISTORY` calcolato dalla radice
     del progetto (parent del package), cosi' `history/` resta alla radice. Golden invariati a ogni
     sotto-passo (170577 / 30356). **Layout target raggiunto** (manca solo il resync doc, G2).
-- [~] **G2** Aggiorna CLAUDE.md, wiki, DECISIONS.md con la nuova architettura. Aggiungi pagina wiki
+- [x] **G2** Aggiorna CLAUDE.md, wiki, DECISIONS.md con la nuova architettura. Aggiungi pagina wiki
   dedicata all'architettura a strati e al formato del contratto.
-  - **Fatto**: `CLAUDE.md` risincronizzato (banner architettura, §1/§3 tabella file, §5/§7/§8
-    heading, §14/§15, nuova §17 su contratto/API/log storico, §13 TODO); `DECISIONS.md` con le
-    righe di chiusura refactoring. **Da fare**: wiki (repo separato).
+  - `CLAUDE.md` risincronizzato (banner architettura, §1/§3 tabella file, §5/§7/§8 heading, §14/§15,
+    nuova §17 su contratto/API/log storico, §13 TODO); `DECISIONS.md` con le righe di chiusura.
+  - **Wiki** (repo separato `Windgram.wiki`, branch `master`): "Architettura e File" riscritta,
+    **nuova pagina "Contratto e API"**, aggiornate Home/Changelog/TODO/Gotchas/Controllo Versione
+    Git/Fisica/Decisioni e Fatti. Commit locale nel clone del wiki, push da confermare con l'utente.
 
 ## Note e rischi
 
