@@ -28,6 +28,7 @@ import numpy as np  # noqa: E402
 import windgram_arome as W  # noqa: E402
 import windgram_v2 as V  # noqa: E402
 from windgram.core.forecast import build_forecast  # noqa: E402
+from windgram.render.json_api import render_json  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURE = os.path.join(ROOT, "tests", "fixtures", "piancavallo_icon_d2.json")
@@ -91,8 +92,9 @@ def build_svg_from_fixture():
 
 
 def build_forecast_json_from_fixture():
-    x = _load_inputs()
-    return _forecast_from_inputs(x).to_json(indent=1)
+    # F1: il golden JSON passa ora per il renderer json_api (render_json), cosi'
+    # la rete di sicurezza esercita la superficie API reale, non to_json diretto.
+    return render_json(_forecast_from_inputs(_load_inputs()), indent=1)
 
 
 def _check(name, produced, golden_path):

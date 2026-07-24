@@ -13,9 +13,10 @@ Deciso con Giovanni il 2026-07-23. Vedi anche `DECISIONS.md` per le scelte di fo
 > di intestazione (data IT, orari corsa/generazione, etichetta modello) le DERIVA il renderer dai
 > metadati del contratto.
 >
-> **Prossimo passo: F1** (Fase F — nuove superfici). E3/E fatte. Nota: E3d ha aggiornato il golden
-> `tests/golden/forecast.json` in UN campo (`generated_utc` 17:09 -> 17:00) per rendere l'harness
-> auto-coerente con l'orario mostrato -- l'SVG golden e' rimasto byte-identico (170577 char).
+> **Prossimo passo: F2** (log storico a costo zero). Fatti anche E3 (E completa) e **F1** (renderer
+> JSON `windgram/render/json_api.py`). Nota: E3d aveva aggiornato il golden `forecast.json` in UN
+> campo (`generated_utc` 17:09 -> 17:00) per auto-coerenza dell'harness -- l'SVG golden e' rimasto
+> byte-identico (170577 char).
 >
 > **Come riprendere in sicurezza**: prima di ogni modifica e dopo, lanciare
 > `py tools/snapshot.py` — deve stampare `[SVG] OK` e `[contratto] OK` (entrambi identici ai
@@ -198,7 +199,12 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
       `windgram_v2.py`: pulizia import rimandata a G1.
 
 ### Fase F — Nuove superfici abilitate dal contratto
-- [ ] **F1** `windgram/render/json_api.py`: serializza il contratto (è di fatto il payload API).
+- [x] **F1** `windgram/render/json_api.py`: serializza il contratto (è di fatto il payload API).
+  - Nuovo pacchetto `windgram/render/` (Strato 2). `render_json(forecast, *, indent=None)` +
+    `CONTENT_TYPE`: punto d'ingresso stabile del payload per API/log/client, separato da
+    `Forecast.to_json` (domani il payload puo' cambiare senza toccare il contratto). `indent=None`
+    = compatto (HTTP), `indent=N` = leggibile (log). `tools/snapshot.py` ora produce il golden JSON
+    via `render_json(..., indent=1)` (esercita la superficie reale). Golden invariati (170577 / 30356).
 - [ ] **F2** Log a costo zero: `cli.py` scrive il contratto JSON in `history/AAAA-MM-GG_run.json`
   a ogni esecuzione. Abilita la futura analisi errore.
 
