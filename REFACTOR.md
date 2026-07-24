@@ -229,8 +229,11 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
     `py windgram_v2.py ...` sia `py -m windgram.cli ...`. `_DEFAULT_HISTORY` calcolato dalla radice
     del progetto (parent del package), cosi' `history/` resta alla radice. Golden invariati a ogni
     sotto-passo (170577 / 30356). **Layout target raggiunto** (manca solo il resync doc, G2).
-- [ ] **G2** Aggiorna CLAUDE.md, wiki, DECISIONS.md con la nuova architettura. Aggiungi pagina wiki
+- [~] **G2** Aggiorna CLAUDE.md, wiki, DECISIONS.md con la nuova architettura. Aggiungi pagina wiki
   dedicata all'architettura a strati e al formato del contratto.
+  - **Fatto**: `CLAUDE.md` risincronizzato (banner architettura, §1/§3 tabella file, §5/§7/§8
+    heading, §14/§15, nuova §17 su contratto/API/log storico, §13 TODO); `DECISIONS.md` con le
+    righe di chiusura refactoring. **Da fare**: wiki (repo separato).
 
 ## Note e rischi
 

@@ -30,8 +30,8 @@ Refactoring a strati in corso: leggere `REFACTOR.md` (punto di ripresa **F1**) p
 3. **TODO / punti aperti sempre aggiornati** — §13 di questo file e la pagina wiki `TODO`. Quando
    un punto viene chiuso, toglierlo; quando emerge un limite o un "andrebbe tarato", aggiungerlo
    subito, non rimandare.
-4. **Commentare sempre il codice in italiano** (coerente con lo stile già presente in
-   `windgram_v2.py`/`windgram_arome.py`).
+4. **Commentare sempre il codice in italiano** (coerente con lo stile già presente nei moduli del
+   package `windgram/`).
 5. **Tabella decisioni e fatti sempre aggiornata**: [`DECISIONS.md`](DECISIONS.md) — ogni scelta
    di design non ovvia dal codice (con motivazione) e ogni fatto empirico scoperto (specialmente
    su Open-Meteo/ICON-D2, spesso richiedono una verifica diretta per essere confermati) va
@@ -41,29 +41,36 @@ Refactoring a strati in corso: leggere `REFACTOR.md` (punto di ripresa **F1**) p
    verifica che codice, `CLAUDE.md`, wiki e `DECISIONS.md` siano ancora allineati fra loro —
    senza aspettare che l'utente lo chieda.
 
-## ⚠ REFACTORING A STRATI IN CORSO (leggere PRIMA di toccare il codice)
+## ✅ ARCHITETTURA A STRATI (refactoring completato — 2026-07-24)
 
-Dal 2026-07-23 il progetto sta migrando da 2 file monolitici a un'architettura a strati
-(`windgram/sources` → `windgram/core` → `windgram/contract` → renderer). **Piano completo e punto
-di ripresa in [`REFACTOR.md`](REFACTOR.md)** — leggerlo prima di modificare.
+Il refactoring da 2 file monolitici a un'architettura a strati netti è **completato** (fasi A–G;
+storia e dettaglio in [`REFACTOR.md`](REFACTOR.md)). Il flusso è a senso unico, ogni strato dipende
+solo da quelli sopra di sé:
 
-Stato: fatti A1–E3 (**Fase E completa**). **Prossimo passo: F1.** In sintesi già oggi:
-- `windgram_arome.py` NON è più il monolite: è una **facciata di ~27 righe** (soli shim) che
-  ri-esporta da `windgram/sources/openmeteo.py` (dati) e `windgram/core/thermals.py` (fisica). Il
-  **rendering PNG v1 (matplotlib/scipy) è stato RITIRATO**.
-- La fisica vive in `windgram/core/` (`thermals.py`, `climb.py`, `aggregate.py`, `forecast.py`); il
-  **contratto** in `windgram/contract.py`. `windgram_v2.py` è ora presentazione + orchestrazione.
-- **Il renderer consuma SOLO il contratto** (E3d): `build_svg(forecast)` /
-  `build_chart(forecast, geom)` — nessuna fisica, nessun array sciolto; anche le stringhe di
-  intestazione le deriva dai metadati del contratto. Restano da fare F (nuove superfici: json_api,
-  log storico) e G (layout `windgram/` definitivo, rimozione shim, resync CLAUDE.md/wiki).
-- **Rete di sicurezza obbligatoria**: dopo ogni modifica lanciare `py tools/snapshot.py` — deve
+```
+windgram/sources  (dati)  →  windgram/core  (fisica)  →  windgram/contract  (il CONTRATTO)  →  windgram/render  (rappresentazioni)
+                                                              ↑ assemblato da core/forecast.py        ├─ svg.py       (dashboard HTML+SVG)
+                                                                                                       └─ json_api.py  (payload JSON / API)
+windgram/cli.py  orchestra la pipeline;  windgram_v2.py alla radice è un lanciatore sottile.
+```
+
+Principi consolidati (non regredire):
+- **Il contratto `Forecast` (`windgram/contract.py`) è il confine unico** fra fisica e
+  rappresentazione. Tutto ciò che sta sopra (sources+core) lo PRODUCE, tutto ciò che sta sotto
+  (render, API, futuri client) lo CONSUMA. È RICCO: porta anche la fisica derivata (profilo vento,
+  profilo lapse, `climb_top`, `wstar_slope_15min`) così un consumatore disegna senza rifare fisica.
+- **I renderer non fanno fisica né I/O**: `build_svg(forecast)` / `build_chart(forecast, geom)` in
+  `windgram/render/svg.py` leggono TUTTO dal contratto (ricostruiscono gli array numpy in testa con
+  l'helper `_narr`); derivano anche le stringhe d'intestazione dai metadati del contratto.
+- **Nessuno shim residuo**: `windgram_arome.py` (vecchio monolite, poi facciata) è stato rimosso; i
+  consumatori importano diretto dal package. La v1 PNG (matplotlib/scipy) è ritirata.
+- **Rete di sicurezza obbligatoria**: dopo OGNI modifica lanciare `py tools/snapshot.py` — deve
   stampare `[SVG] OK` e `[contratto] OK` (identici ai golden in `tests/golden/`).
 
-Le §3, §5, §7-§10 qui sotto descrivono correttamente COSA fa il codice (comportamento invariato dal
-refactoring) ma i riferimenti a *dove* vive una funzione vanno letti alla luce della nuova
-struttura. La risincronizzazione completa di CLAUDE.md/wiki con l'architettura finale è pianificata
-per la Fase G2 del refactoring.
+Nota storica utile: fino al 2026-07-23 la fisica/dati vivevano in `windgram_arome.py` e il rendering
+in `windgram_v2.py`; **molte frasi delle §5–§10 dicono ancora "in windgram_v2/windgram_arome"** dove
+oggi si intende il modulo corrispondente del package (indicato di volta in volta). Il COMPORTAMENTO
+descritto è invariato; cambia solo *dove* vive il codice — vedi la tabella §3.
 
 ---
 
@@ -77,9 +84,12 @@ Ispirato ai windgram RASP/FIVL (blipmap di DrJack / XCTherm-RegTherm), ricostrui
 del modello **ICON-D2 (~2.2 km)** via **API pubblica Open-Meteo** (gratuita, no key, CORS ok).
 
 Deliverable:
-- **v2** `windgram_v2.py` — **dashboard HTML+SVG** (cruscotto da pilota). È il deliverable attivo.
-- **v1** (grafico tecnico PNG matplotlib) — **RITIRATA** il 2026-07-23 (refactoring). Storicamente
-  stava in `windgram_arome.py`, che ora è solo una facciata di shim — vedi §3 e `REFACTOR.md`.
+- **dashboard HTML+SVG** (cruscotto da pilota) — deliverable attivo. Si lancia con `windgram_v2.py`
+  (lanciatore sottile → `windgram.cli`), rendering in `windgram/render/svg.py`.
+- **payload JSON** del contratto (`windgram/render/json_api.py`) — di fatto l'API/dato serializzato,
+  già disponibile; sarà la base per client mobile/widget e per la correzione statistica.
+- **v1** (grafico tecnico PNG matplotlib) — **RITIRATA** il 2026-07-23 (stava in `windgram_arome.py`,
+  poi eliminato in Fase G) — vedi §3 e `REFACTOR.md`.
 
 ---
 
@@ -97,26 +107,28 @@ PNG è stata ritirata, `matplotlib`/`scipy` **non servono più**.
 
 ---
 
-## 3. File del progetto e stato (post-refactoring, aggiornato 2026-07-23)
+## 3. File del progetto e stato (architettura finale, aggiornato 2026-07-24)
 
-| File / cartella | Ruolo | Stato |
+| File / cartella | Strato | Ruolo |
 |------|-------|-------|
-| `windgram/sources/openmeteo.py` | **Strato 0** — fetch/parsing Open-Meteo (`build_params, fetch, fetch_elevation, fetch_shf15, fetch_model_run, to_grid` + costanti `PLEVELS, HLEVELS, API, ELEV_API, META_PATH`). Solo `requests numpy`. | Attivo |
-| `windgram/core/thermals.py` | **Strato 1** — fisica (`lapse_grid, lcl_height, thermals, wind_profile, wind_samples, make_vscale`). Solo numpy. | Attivo |
-| `windgram/core/climb.py` | Strato 1 — `climb_ceiling, SINK_RATE` (quota realisticamente raggiungibile). | Attivo |
-| `windgram/core/aggregate.py` | Strato 1 — `aggregate, _best_block, _card16` (stelle, finestra, range). | Attivo |
-| `windgram/core/forecast.py` | `build_forecast(...)` — assembla il **contratto** dagli output fisica. | Attivo |
-| `windgram/contract.py` | **Strato 1.5** — dataclass `Forecast` v1.0 (+ `Meta/Hour/Surface/WindProfile/LapseProfile`) e (de)serializzazione JSON. | Attivo |
-| `windgram_v2.py` | **Renderer** dashboard HTML+SVG (`build_svg`, `build_chart`) + orchestrazione (`main`). Importa `windgram_arome as W` e i moduli `windgram.core.*`. | In sviluppo attivo |
-| `windgram_arome.py` | **Facciata di compatibilità** (~27 righe): ri-esporta i moduli sopra così `W.fetch`, `W.thermals`, ecc. restano invariati. La v1 PNG (matplotlib/scipy) è stata **rimossa**. | Shim, da assorbire in Fase G |
-| `tools/snapshot.py` · `tools/capture_fixture.py` | Rete di sicurezza del refactoring (golden SVG + contratto). | Attivi |
-| `tests/` | `fixtures/` (risposta Open-Meteo salvata), `golden/` (dashboard.svg + forecast.json), `test_contract.py`. | Attivi |
+| `windgram/sources/openmeteo.py` | 0 — dati | fetch/parsing Open-Meteo (`build_params, fetch, fetch_elevation, fetch_shf15, fetch_model_run, to_grid` + costanti `PLEVELS, HLEVELS, API, ELEV_API, META_PATH`). Solo `requests numpy`. |
+| `windgram/core/thermals.py` | 1 — fisica | `lapse_grid, lcl_height, thermals, wind_profile, wind_samples, make_vscale`. Solo numpy. |
+| `windgram/core/climb.py` | 1 — fisica | `climb_ceiling, SINK_RATE` (quota realisticamente raggiungibile). |
+| `windgram/core/aggregate.py` | 1 — fisica/logica | `aggregate, _best_block, _card16` (stelle, finestra, range; `_card16` gradi→cardinale, usato anche dal renderer nella tabella). |
+| `windgram/core/forecast.py` | 1 → 1.5 | `build_forecast(...)` — assembla il **contratto** dagli output della fisica (incl. profili vento/lapse e `wstar_slope_15min`). |
+| `windgram/contract.py` | 1.5 — contratto | dataclass `Forecast` v1.0 (+ `Meta/Hour/Surface/WindProfile/LapseProfile`) e (de)serializzazione JSON. |
+| `windgram/render/svg.py` | 2 — rappresentazione | **renderer dashboard HTML+SVG**: `build_svg(forecast)`, `build_chart(forecast, geom)` + tutti gli helper SVG/icone/colori. Consuma SOLO il contratto. |
+| `windgram/render/json_api.py` | 2 — rappresentazione | `render_json(forecast, *, indent=None)` + `CONTENT_TYPE`: payload JSON (API / log / client). |
+| `windgram/cli.py` | orchestrazione | `main()` (sources→core→contract→render) + `write_history` (log storico, §17). |
+| `windgram_v2.py` | lanciatore | ~12 righe: `from windgram.cli import main`. Mantiene invariata l'invocazione `py windgram_v2.py …` (equiv. `py -m windgram.cli …`). |
+| `tools/snapshot.py` · `tools/capture_fixture.py` | rete di sicurezza | golden SVG+contratto / cattura fixture Open-Meteo. |
+| `tests/` | test | `fixtures/` (risposta Open-Meteo salvata), `golden/` (`dashboard.svg` + `forecast.json`), `test_contract.py`. |
 
 **Rete di sicurezza**: dopo ogni modifica lanciare `py tools/snapshot.py` → deve stampare
-`[SVG] OK` e `[contratto] OK`. Vedi `REFACTOR.md` per il piano e il punto di ripresa (F1).
+`[SVG] OK` e `[contratto] OK`. Vedi `REFACTOR.md` per la storia del refactoring.
 
-Nota storica: `windgram_arome.py` è stato a lungo un monolite di ~695 righe (dati+fisica+PNG). Non
-dare per scontato lo stato di un file: **verificare con `wc -l` / `grep "^def"` prima di assumere.**
+Nota: `windgram_arome.py` è stato a lungo un monolite di ~695 righe (dati+fisica+PNG), poi una
+facciata di shim, infine **rimosso** in Fase G1. Se una sezione più sotto lo nomina, è storia.
 
 ---
 
@@ -147,7 +159,7 @@ generico fa **fallback silenzioso** su ARPEGE — un dato che torna NON garantis
 
 ---
 
-## 5. Fisica / calcoli (`thermals`, in windgram_arome)
+## 5. Fisica / calcoli (`thermals`, in `windgram/core/thermals.py`)
 
 Approccio RASP-equivalente sui parametri PUNTUALI, usando i campi FISICI già calcolati da ICON-D2
 (ICON è un modello mesoscala completo: la fisica del boundary layer è già girata).
@@ -192,7 +204,7 @@ per banda; sopra i 2000 m tacche ogni 200 m (non più rade). Scala UNICA a destr
 
 ---
 
-## 7. v2 — Layout dashboard (`build_svg` in windgram_v2.py)
+## 7. v2 — Layout dashboard (`build_svg` in `windgram/render/svg.py`)
 
 Canvas SVG `viewBox 0 0 1500 1000`. Font Inter/Segoe UI. Card arrotondate, ombra (`filter #sh`),
 palette morbida. Sei zone:
@@ -297,7 +309,7 @@ palette morbida. Sei zone:
 
 ---
 
-## 8. v2 — Aggregazioni e formule (`aggregate` in windgram_v2.py)
+## 8. v2 — Aggregazioni e formule (`aggregate` in `windgram/core/aggregate.py`)
 
 Sulla finestra **diurna** (`shortwave_radiation>20`). "Ore con nuvole" = `cloud_cover_low>=10`.
 
@@ -463,16 +475,21 @@ delle"→"Modello dati aggiornato alle".
 
 ## 13. TODO / prossimi passi
 
+- Il **refactoring a strati (Fasi A–G) è concluso** — non è più un lavoro in corso. Il log storico
+  dei contratti (§17) ora raccoglie automaticamente i dati per le tarature qui sotto.
 - **Tarare** soglie stelle/flyscore su giornate reali (vedi §8) — non ancora fatto.
 - **Tarare** `SINK_RATE` e il coefficiente del profilo verticale in `climb_ceiling` (vedi §5) su
   voli reali — non ancora fatto.
 - Valutare direzione vento "ora di punta" vs media vettoriale.
 - Eventuale confronto multi-modello (ICON-D2 vs ICON-2I) affiancato.
+- Possibili superfici future abilitate dal contratto: endpoint API, client mobile/widget WordPress,
+  correzione statistica sulle osservazioni (i dati sono già loggati, §17).
 
 ## 14. Gotchas operativi
 
 - Windows: usare `py`, non `python`. Salvare i .py in **UTF-8** (contengono °, ×, ΔT, à…).
-- I due file .py DEVONO stare nella stessa cartella (v2 importa v1).
+- Si lancia dalla **radice del progetto** (`py windgram_v2.py …`) così il package `windgram/` è
+  importabile; equivalente `py -m windgram.cli …`. Non più "due file nella stessa cartella".
 - L'utente ha avuto problemi di **download dal browser** (claude.ai): a volte i file vanno
   ricevuti via copia-incolla. Tenerne conto nella consegna.
 - Test senza rete: nessun `test_v2.py` è presente in cartella al momento. Se serve sviluppare il
@@ -488,10 +505,10 @@ Repository git inizializzato il 2026-07-23. Collegato a **GitHub** come reposito
 funzione Wiki — su piano gratuito il Wiki richiede repo pubblico):
 `https://github.com/GiovanniBellomo/Windgram` (remote `origin`, branch `main`).
 
-`.gitignore` esclude: output generati (`*.html`, `*.png` — rigenerabili da codice + dati live,
-non ha senso versionarli) e `.claude/` (config locale di Claude Code, specifica della macchina).
-Restano tracciati: `windgram_v2.py`, `windgram_arome.py`, `CLAUDE.md`, `DECISIONS.md`,
-`Esecuzione.txt`.
+`.gitignore` esclude: output generati (`*.html`, `*.png`), il log storico `history/` (§17) e
+`.claude/` (config locale di Claude Code) — tutti rigenerabili/locali. Restano tracciati: il package
+`windgram/` (sources/core/contract/render/cli), il lanciatore `windgram_v2.py`, `tools/`, `tests/`,
+`CLAUDE.md`, `DECISIONS.md`, `REFACTOR.md`, `Esecuzione.txt`.
 
 Regola di commit/push: vedi le **Regole di lavoro permanenti** in cima a questo file.
 
@@ -502,3 +519,28 @@ trasposizione human-friendly di questo stesso file (repo del wiki separato, clon
 `https://github.com/GiovanniBellomo/Windgram.wiki.git`, branch `master` non `main`). **Se
 CLAUDE.md viene aggiornato, il wiki andrebbe risincronizzato di conseguenza** (non è automatico) —
 altrimenti le due fonti divergono nel tempo. `CLAUDE.md` resta la fonte di verità primaria.
+
+## 17. Il contratto, l'API JSON e il log storico
+
+Frutto delle Fasi E/F del refactoring (dettaglio in `REFACTOR.md`, motivazioni in `DECISIONS.md`).
+
+- **Contratto `Forecast` (`windgram/contract.py`, `contract_version = "1.0"`)** — struttura dati
+  versionata, JSON-safe (float/int/str/bool/None/list/dict; NIENTE numpy, NIENTE NaN: i mancanti
+  sono `None`). È il confine unico fra fisica e rappresentazione. È **RICCO**: oltre ai grezzi
+  porta la fisica derivata che il renderer altrimenti ricalcolerebbe — `WindProfile` (vento risolto
+  alle quote native, componenti u/v), `LapseProfile` (gradiente a strati per lo sfondo),
+  `climb_top_m`, `wstar_slope_15min` (dipende dal dato a 15', non ricavabile a valle). Struttura:
+  `Forecast{contract_version, Meta, hours[Hour{…, Surface, WindProfile, LapseProfile}], aggregates}`.
+  Regola: SOLO dati semantici, niente colori/pixel/stringhe di layout (quelli li produce il render).
+- **Assemblaggio**: `windgram/core/forecast.py:build_forecast(...)` prende gli output della fisica e
+  costruisce il contratto (conversione numpy→JSON-safe qui, a monte).
+- **Payload JSON / API**: `windgram/render/json_api.py:render_json(forecast, *, indent=None)` +
+  `CONTENT_TYPE`. È il punto d'ingresso stabile del payload (separato da `Forecast.to_json` così la
+  forma può evolvere senza toccare il contratto). `indent=None` = compatto (HTTP), `indent=N` =
+  leggibile (log/ispezione).
+- **Log storico a costo ~zero (F2)**: `windgram/cli.py:write_history(forecast, dir)` scrive il
+  contratto (via `render_json`, indentato) in `history/AAAA-MM-GG_<modello>_run<AAAAMMGGTHHMMZ>.json`
+  a ogni run — un file per (giorno previsto, modello, corsa), idempotente. Serve alla **futura
+  correzione statistica** (confronto previsione vs osservazioni reali). CLI: `--history-dir`
+  (default `<radice>/history`) e `--no-history`. `history/` è git-ignored. La scrittura non fa mai
+  fallire la generazione del windgram (errore → warning e prosegue).
