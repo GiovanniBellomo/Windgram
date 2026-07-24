@@ -5,13 +5,14 @@ netti, **per piccoli passi**, ognuno committabile e **verificabile a output inva
 Deciso con Giovanni il 2026-07-23. Vedi anche `DECISIONS.md` per le scelte di fondo.
 
 > ## ▶ STATO / RIPRENDERE DA QUI (2026-07-24)
-> Fatto: **A1, B1, C1, C2, C3, D1, E1, E2, E3a**. A1-E2 pushati su `origin/main` (commit
-> `98ead9c`); E3a committato in locale, **non ancora pushato**. Dati, fisica e contratto sono
+> Fatto: **A1, B1, C1, C2, C3, D1, E1, E2, E3a, E3b**. A1-E2 pushati su `origin/main` (commit
+> `98ead9c`); E3a/E3b committati in locale, **non ancora pushati**. Dati, fisica e contratto sono
 > separati e testati; `windgram_arome.py` e' una facciata di soli shim; niente piu'
-> matplotlib/scipy. Il contratto e' ora l'INGRESSO del rendering (`build_svg(forecast, ...)`),
-> ma il renderer non lo consuma ancora (ricalcola internamente).
+> matplotlib/scipy. Il contratto e' l'INGRESSO del rendering (`build_svg(forecast, ...)`); il
+> renderer legge gia' `climb_top_m` e `wstar_slope_15min` dal contratto (E3b), ma vento, lapse e
+> gli scalari per-ora sono ancora ricalcolati (E3c/E3d).
 >
-> **Prossimo passo: E3b** (vedi checklist Fase E). E3 e' spezzato in 4 sotto-passi (E3a-E3d)
+> **Prossimo passo: E3c** (vedi checklist Fase E). E3 e' spezzato in 4 sotto-passi (E3a-E3d)
 > perche' e' il piu' delicato: far consumare il contratto al renderer, a golden invariato.
 >
 > **Come riprendere in sicurezza**: prima di ogni modifica e dopo, lanciare
@@ -164,8 +165,14 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
     - `build_svg` ha ora `forecast` come primo parametro (non ancora consumato). `main()` chiama
       `build_forecast(...)` prima di `build_svg`. `tools/snapshot.py` estratto `_forecast_from_inputs`
       condiviso da SVG e golden JSON. Entrambi i golden invariati (170577 / 30356 char).
-  - [ ] **E3b** `build_chart` usa `climb_top_m` e `wstar_slope_15min` DAL contratto invece di
+  - [x] **E3b** `build_chart` usa `climb_top_m` e `wstar_slope_15min` DAL contratto invece di
     ricalcolarli (rimuove la duplicazione `climb_ceiling`/`_slope` nel renderer). Golden invariato.
+    - Rimossi da `build_chart` il ricalcolo `climb_ceiling` per ora e l'intera catena
+      `_interp`/`_w_at`/`_slope` (col dato shf15 a 15'): ora `climb_top` si ricostruisce da
+      `forecast.hours[j].climb_top_m` (None -> NaN, filtro `np.isnan` invariato) e lo slope si
+      legge da `forecast.hours[j].wstar_slope_15min`. `therm_opacity` gia' tratta None come NaN.
+      Il parametro `shf15` di `build_chart` e' ora inutilizzato (rimozione firma rimandata a E3d).
+      Entrambi i golden invariati (170577 / 30356 char).
   - [ ] **E3c** `build_chart` usa il profilo vento (`wind`) e il profilo lapse (`lapse`) dal
     contratto, non piu' ricalcolati con `wind_profile`/`lapse_grid`. Golden invariato.
   - [ ] **E3d** `build_chart`/`build_svg` leggono gli scalari per-ora (wstar, zi, lcl, superficie…)

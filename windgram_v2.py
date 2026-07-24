@@ -312,8 +312,13 @@ def _lapse_at(ez, lv, z):
 # stati spostati in windgram/core/climb.py (REFACTOR.md, C2) e importati in cima.
 
 
-def build_chart(times, levels, hwind, surf, elev, zi, wstar, lcl,
+def build_chart(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
                 overdev, top_agl, geom, shf15=None):
+    # E3b (REFACTOR.md): `climb_top_m` e `wstar_slope_15min` si leggono ora DAL
+    # contratto (`forecast.hours[j]`) invece di ricalcolarli qui -- rimossa la
+    # duplicazione di climb_ceiling e della catena _w_at/_slope (con il dato
+    # shf15 a 15'), che vive gia' in windgram.core.forecast.build_forecast. Il
+    # parametro `shf15` non e' piu' usato qui (verra' tolto dalla firma in E3d).
     px, py, pw, ph = geom
     nt = len(times)
     z2y, agl2y, top_agl, fr = W.make_vscale(elev, top_agl=top_agl)
@@ -521,70 +526,22 @@ def build_chart(times, levels, hwind, surf, elev, zi, wstar, lcl,
     # visivo (colore=intensita', trasparenza=stabilita') gia' validato: un vero
     # <linearGradient>, un colore/opacita' "puro" esattamente
     # ad ogni ora, sfumato con continuita' verso le ore vicine, senza gradini.
-    climb_top = np.array([climb_ceiling(elev, zi[j], lcl[j], wstar[j])
-                          for j in range(nt)])
+    # climb_top per ora dal contratto (None -> NaN, cosi' il filtro np.isnan e
+    # le proprieta' della linea restano identici a prima). Lo slope di W* su
+    # +-15' (che dipende dal dato shf15 a 15') e' anch'esso precalcolato nel
+    # contratto: qui si legge soltanto.
+    climb_top = np.array([h.climb_top_m if h.climb_top_m is not None else np.nan
+                          for h in forecast.hours])
     idxs = [j for j in range(nt) if not np.isnan(climb_top[j])]
     pts2 = [(X(j), Yz(climb_top[j])) for j in idxs]
     if len(pts2) >= 2:
-        # variabilita' locale su una finestra di 15' prima/dopo (non piu' 1h
-        # prima/dopo). boundary_layer_height/T2m/psurf non sono disponibili a
-        # 15' su Open-Meteo (verificato: sempre null), quindi restano
-        # interpolati linearmente dall'ora -- MA sensible_heat_flux SI' (varia
-        # davvero ogni 15', non e' il dato orario ripetuto): se e' stato
-        # scaricato (`shf15`), viene usato quello vero per ricalcolare un W*
-        # locale piu' fedele; altrimenti si ripiega sulla semplice
-        # interpolazione lineare del W* orario gia' calcolato.
-        shf15_t, shf15_v = shf15 if shf15 else (None, None)
-
-        def _interp(arr, t_frac):
-            if arr is None:
-                return np.nan
-            t = min(max(t_frac, 0.0), nt - 1)
-            i0 = int(np.floor(t)); i1 = min(i0 + 1, nt - 1)
-            f = t - i0
-            a, b = arr[i0], arr[i1]
-            if np.isnan(a):
-                return b
-            if np.isnan(b):
-                return a
-            return a + (b - a) * f
-
-        def _w_at(j, frac_h):
-            t_frac = j + frac_h
-            if shf15_t:
-                # D dallo stesso `zi' gia' risolto da thermals() (blh reale se
-                # disponibile, altrimenti il suo fallback a particella secca) --
-                # NON dal blh grezzo, che qui puo' essere NaN per l'intera
-                # finestra pur avendo zi/wstar orari validi (visto succedere).
-                D = _interp(zi, t_frac) - elev
-                T2 = _interp(surf.get("T2m"), t_frac)
-                psurf = _interp(surf.get("psurf"), t_frac)
-                swr = _interp(surf.get("swr"), t_frac)
-                if not np.isnan(swr) and swr <= 20:
-                    return 0.0
-                if (not np.isnan(swr) and not np.isnan(D) and D > 50
-                        and not np.isnan(T2)):
-                    Tk = T2 + 273.15
-                    rho = ((psurf * 100.0) / (287.0 * Tk)
-                          if not np.isnan(psurf) else 1.12)
-                    t_abs = times[0] + dt.timedelta(hours=t_frac)
-                    k = min(range(len(shf15_t)),
-                           key=lambda i: abs((shf15_t[i] - t_abs).total_seconds()))
-                    qs = shf15_v[k]
-                    if not np.isnan(qs):
-                        wtheta = abs(qs) / (rho * 1005.0)
-                        return (9.81 / Tk * wtheta * D) ** (1.0 / 3.0)
-            return _interp(wstar, t_frac)          # ripiego: W* orario interpolato
-
-        def _slope(j):
-            return _w_at(j, 0.25) - _w_at(j, -0.25)
-
         gstops = []
         for j in idxs:
             w = wstar[j]
             off = (X(j) - px) / pw
+            slope = forecast.hours[j].wstar_slope_15min
             gstops.append(f'<stop offset="{off:.3f}" stop-color="{therm_color(w)}" '
-                          f'stop-opacity="{therm_opacity(w, _slope(j)):.2f}"/>')
+                          f'stop-opacity="{therm_opacity(w, slope):.2f}"/>')
         defs.append(f'<linearGradient id="thermgrad" x1="{px:.1f}" y1="0" '
                     f'x2="{px+pw:.1f}" y2="0" gradientUnits="userSpaceOnUse">'
                     f'{"".join(gstops)}</linearGradient>')
@@ -796,8 +753,8 @@ def build_svg(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
                 f'gradientUnits="userSpaceOnUse">{gstops}</linearGradient>')
     S.append(rrect(px, bar_y, pw, bar_h, 4, "url(#wbar)", "#c9d0da", 0.8))
 
-    cdefs, cbody = build_chart(times, levels, hwind, surf, elev, zi, wstar, lcl,
-                               overdev, top_agl, geom, shf15)
+    cdefs, cbody = build_chart(forecast, times, levels, hwind, surf, elev, zi, wstar,
+                               lcl, overdev, top_agl, geom, shf15)
     defs.append(cdefs)
     S.append(cbody)
 
