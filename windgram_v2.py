@@ -29,6 +29,7 @@ import windgram_arome as W
 # `_card16` (gradi->cardinale) e' condiviso: lo usa anche il rendering (tabella).
 from windgram.core.climb import climb_ceiling, SINK_RATE  # noqa: F401
 from windgram.core.aggregate import aggregate, _card16  # noqa: F401
+from windgram.core.forecast import build_forecast
 
 ROME_TZ = ZoneInfo("Europe/Rome")
 
@@ -680,10 +681,15 @@ def ic_snowflake(cx, cy, r=5.0, col=ICE):
 
 
 # =========================================================================== #
-def build_svg(times, levels, hwind, surf, elev, zi, wstar, lcl,
+def build_svg(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
               overdev, agg, name, model_label, run_label, top_agl,
               date_str, period_str, run_time_str, gen_time_str,
               lat, lon, shf15=None):
+    # E3a (REFACTOR.md): il contratto `forecast` (windgram.contract.Forecast) e'
+    # ora l'INGRESSO del rendering. In questo passo non e' ancora consumato --
+    # il renderer ricalcola ancora tutto dagli array sciolti -- ma il flusso
+    # fisica -> build_forecast -> render(forecast, ...) e' in piedi. E3b/E3c/E3d
+    # sposteranno progressivamente le letture dagli array al contratto.
     Wpx, Hpx = 1500, 1000
     defs = ['<filter id="sh" x="-20%" y="-20%" width="140%" height="140%">'
             '<feDropShadow dx="0" dy="1.5" stdDeviation="3" flood-color="#1b2a4a" '
@@ -962,7 +968,18 @@ def main():
     date_str = f"{wd[d0.weekday()].capitalize()} {d0.day} {months[d0.month]} {d0.year}"
     period_str = f"{args.start:02d}:00 - {args.end:02d}:00 (ora locale)"
 
-    svg = build_svg(times, levels, hwind, surf, elev, zi, wstar, lcl,
+    # E3a (REFACTOR.md): assembla il contratto e passalo come INGRESSO del
+    # rendering (fisica -> build_forecast -> render). Il renderer non lo consuma
+    # ancora (ricalcola internamente), ma da qui il flusso e' quello finale.
+    forecast = build_forecast(
+        times, levels, hwind, surf, elev, zi, wstar, lcl, work_top, overdev, agg,
+        site=args.name, lat=args.lat, lon=args.lon, model=args.model,
+        run_utc=(init.isoformat() if init is not None else None),
+        generated_utc=dt.datetime.now(dt.timezone.utc).isoformat(),
+        timezone="Europe/Rome", top_agl=args.top_agl,
+        period_start_h=args.start, period_end_h=args.end, shf15=shf15)
+
+    svg = build_svg(forecast, times, levels, hwind, surf, elev, zi, wstar, lcl,
                     overdev, agg, args.name, model_label, run_label, args.top_agl,
                     date_str, period_str, run_time_str, gen_time_str,
                     args.lat, args.lon, shf15)

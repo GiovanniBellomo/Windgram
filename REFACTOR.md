@@ -4,14 +4,15 @@ Documento di lavoro. Definisce la migrazione da 2 file monolitici a un'architett
 netti, **per piccoli passi**, ognuno committabile e **verificabile a output invariato**.
 Deciso con Giovanni il 2026-07-23. Vedi anche `DECISIONS.md` per le scelte di fondo.
 
-> ## ▶ STATO / RIPRENDERE DA QUI (2026-07-23)
-> Fatto: **A1, B1, C1, C2, C3, D1, E1, E2** (tutti pushati su `origin/main`, ultimo commit
-> `98ead9c`). Dati, fisica e contratto sono separati e testati; `windgram_arome.py` e' una
-> facciata di soli shim; niente piu' matplotlib/scipy.
+> ## ▶ STATO / RIPRENDERE DA QUI (2026-07-24)
+> Fatto: **A1, B1, C1, C2, C3, D1, E1, E2, E3a**. A1-E2 pushati su `origin/main` (commit
+> `98ead9c`); E3a committato in locale, **non ancora pushato**. Dati, fisica e contratto sono
+> separati e testati; `windgram_arome.py` e' una facciata di soli shim; niente piu'
+> matplotlib/scipy. Il contratto e' ora l'INGRESSO del rendering (`build_svg(forecast, ...)`),
+> ma il renderer non lo consuma ancora (ricalcola internamente).
 >
-> **Prossimo passo: E3a** (vedi checklist Fase E). E3 e' stato spezzato in 4 sotto-passi
-> (E3a-E3d) perche' e' il piu' delicato: far consumare il contratto al renderer, a golden
-> invariato.
+> **Prossimo passo: E3b** (vedi checklist Fase E). E3 e' spezzato in 4 sotto-passi (E3a-E3d)
+> perche' e' il piu' delicato: far consumare il contratto al renderer, a golden invariato.
 >
 > **Come riprendere in sicurezza**: prima di ogni modifica e dopo, lanciare
 > `py tools/snapshot.py` — deve stampare `[SVG] OK` e `[contratto] OK` (entrambi identici ai
@@ -157,9 +158,12 @@ Legenda stato: `[ ]` da fare · `[~]` in corso · `[x]` fatto.
 - **E3** Rifai `build_svg`/`build_chart` perché consumino il `Forecast` invece dei ~20 parametri
   sciolti. Il piu' delicato → **spezzato in 4 sotto-passi**, ognuno a golden SVG invariato e con
   commit proprio:
-  - [ ] **E3a** Sposta la costruzione del contratto in `main()`: `fisica → build_forecast →
+  - [x] **E3a** Sposta la costruzione del contratto in `main()`: `fisica → build_forecast →
     render(forecast, …)`. Il contratto diventa l'INGRESSO del rendering; internamente il renderer
     ancora ricalcola. Golden invariato.
+    - `build_svg` ha ora `forecast` come primo parametro (non ancora consumato). `main()` chiama
+      `build_forecast(...)` prima di `build_svg`. `tools/snapshot.py` estratto `_forecast_from_inputs`
+      condiviso da SVG e golden JSON. Entrambi i golden invariati (170577 / 30356 char).
   - [ ] **E3b** `build_chart` usa `climb_top_m` e `wstar_slope_15min` DAL contratto invece di
     ricalcolarli (rimuove la duplicazione `climb_ceiling`/`_slope` nel renderer). Golden invariato.
   - [ ] **E3c** `build_chart` usa il profilo vento (`wind`) e il profilo lapse (`lapse`) dal

@@ -77,13 +77,26 @@ def _load_inputs():
                 agg=agg, lat=fx["lat"], lon=fx["lon"])
 
 
+def _forecast_from_inputs(x):
+    """Assembla il Forecast (contratto) dagli input deterministici. Condiviso da
+    SVG (ingresso del rendering, E3a) e dal golden JSON."""
+    return build_forecast(
+        x["times"], x["levels"], x["hwind"], x["surf"], x["elev"],
+        x["zi"], x["wstar"], x["lcl"], x["work_top"], x["overdev"], x["agg"],
+        site=NAME, lat=x["lat"], lon=x["lon"], model=x["model"],
+        run_utc=RUN_UTC, generated_utc=GEN_UTC, timezone=TIMEZONE,
+        top_agl=TOP_AGL, period_start_h=START, period_end_h=END, shf15=x["shf15"])
+
+
 def build_svg_from_fixture():
     x = _load_inputs()
     d0 = x["times"][0]
     date_str = f"{WD[d0.weekday()].capitalize()} {d0.day} {MONTHS[d0.month]} {d0.year}"
     period_str = f"{START:02d}:00 - {END:02d}:00 (ora locale)"
     model_label = LABELS.get(x["model"], x["model"])
-    return V.build_svg(x["times"], x["levels"], x["hwind"], x["surf"], x["elev"],
+    forecast = _forecast_from_inputs(x)  # E3a: contratto = ingresso del rendering
+    return V.build_svg(forecast,
+                       x["times"], x["levels"], x["hwind"], x["surf"], x["elev"],
                        x["zi"], x["wstar"], x["lcl"], x["overdev"], x["agg"],
                        NAME, model_label, RUN_LABEL, TOP_AGL,
                        date_str, period_str, RUN_TIME_STR, GEN_TIME_STR,
@@ -92,13 +105,7 @@ def build_svg_from_fixture():
 
 def build_forecast_json_from_fixture():
     x = _load_inputs()
-    fc = build_forecast(
-        x["times"], x["levels"], x["hwind"], x["surf"], x["elev"],
-        x["zi"], x["wstar"], x["lcl"], x["work_top"], x["overdev"], x["agg"],
-        site=NAME, lat=x["lat"], lon=x["lon"], model=x["model"],
-        run_utc=RUN_UTC, generated_utc=GEN_UTC, timezone=TIMEZONE,
-        top_agl=TOP_AGL, period_start_h=START, period_end_h=END, shf15=x["shf15"])
-    return fc.to_json(indent=1)
+    return _forecast_from_inputs(x).to_json(indent=1)
 
 
 def _check(name, produced, golden_path):
